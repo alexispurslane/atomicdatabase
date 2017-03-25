@@ -1,0 +1,99 @@
+In text display, line wrap is the feature of continuing on a new line when a
+line is full, such that each line fits in the viewable window, allowing text to
+be read from top to bottom without any horizontal scrolling. Word wrap is the
+additional feature of most text editors, word processors, and web browsers, of
+breaking lines between and not within words, except when a single word is longer
+than a line.
+
+A soft return or soft wrap is the break resulting from line wrap or word wrap
+(whether automatic or manual), whereas a hard return or hard wrap is an
+intentional break, creating a new paragraph. With a hard enter, paragraph-break
+formatting may be applied (either indenting or vertical whitespace). Soft
+wrapping allows line lengths to adjust automatically with adjustments to the
+width of the user's window or margin settings, and is a standard feature of all
+modern text editors, word processors, and email clients. Manual soft breaks are
+unnecessary when word wrap is automatically, so hitting the "Enter" key usually
+produces a hard return.
+
+Alternatively, "soft enter" can mean an intentional, stored line break that is
+not a paragraph break. For example, it is common to print postal addresses in a
+multiple-line format, but the several lines are understood to be a single
+paragraph. Line breaks are needed to divide the words of the address into lines
+of the appropriate length.
+
+In the contemporary graphical word processors Microsoft Word and OpenOffice.org,
+users are expected to type a carriage return (enter key) between each paragraph.
+Formatting settings, such as first-line indentation or spacing between
+paragraphs, take effect where the carriage return marks the break. A
+non-paragraph line break, which is a soft return, is inserted using shift-enter
+or via the menus, and is provided for cases when the text should start on a new
+line but none of the other side effects of starting a new paragraph are desired.
+
+In text-oriented markup languages, a soft return is typically offered as a
+markup tag. For example, in HTML there is a <br> tag that has the same purpose
+as the soft return in word processors described above; the <p> tag is used to
+contain paragraphs.
+
+The Unicode character set provides a line separator character as well as a
+paragraph separator to represent the semantics of the soft return and hard
+return.
+
+    0x2028 LINE SEPARATOR
+
+    * may be used to represent this semantic unambiguously
+
+    0x2029 PARAGRAPH SEPARATOR
+
+    * may be used to represent this semantic unambiguously
+
+The soft returns are usually placed after the ends of complete words, or after
+the punctuation that follows complete words. However, word wrap may also occur
+following a hyphen inside of a word. This is sometimes not desired, and can be
+blocked by using a non-breaking hyphen, or hard hyphen, instead of a regular
+hyphen.
+
+A word without hyphens can be made wrappable by having soft hyphens in it. When
+the word isn't wrapped (i.e., isn't broken across lines), the soft hyphen isn't
+visible. But if the word is wrapped across lines, this is done at the soft
+hyphen, at which point it is shown as a visible hyphen on the top line where the
+word is broken. (In the rare case of a word that is meant to be wrappable by
+breaking it across lines but without making a hyphen ever appear, a zero-width
+space is put at the permitted breaking point(s) in the word.)
+
+Sometimes word wrap is undesirable between adjacent words. In such cases, word
+wrap can usually be blocked by using a hard space or non-breaking space between
+the words, instead of regular spaces.
+
+In Chinese, Japanese, and Korean, each Han character is normally considered a
+word,[citation needed] and therefore word wrapping can usually occur before and
+after any Han character.
+
+Under certain circumstances, however, word wrapping is not desired. For
+instance,
+
+    word wrapping might not be desired within personal names, and
+
+    word wrapping might not be desired within any compound words (when the text
+is flush left but only in some styles).
+
+Most existing word processors and typesetting software cannot handle either of
+the above scenarios.
+
+CJK punctuation may or may not follow rules similar to the above-mentioned
+special circumstances. It is up to line breaking rules in CJK.
+
+A special case of line breaking rules in CJK, however, always applies: line wrap
+must never occur inside the CJK dash and ellipsis. Even though each of these
+punctuation marks must be represented by two characters due to a limitation of
+all existing character encodings, each of these are intrinsically a single
+punctuation mark that is two ems wide, not two one-em-wide punctuation marks.
+
+Word wrapping is an optimization problem. Depending on what needs to be
+optimized for, different algorithms are used.
+
+A simple way to do word wrapping is to use a greedy algorithm that puts as many
+words on a line as possible, then moving on to the next line to do the same
+until there are no more words left to place. This method is used by many modern
+word processors, such as OpenOffice.org Writer and Microsoft Word. This
+algorithm always uses the minimum possible number of lines but may lead to lines
+of widely varying lengths. The following pseudocode implements this algorithm:

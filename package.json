@@ -1,0 +1,31 @@
+{
+  "name": "atomicdatabase",
+  "version": "0.1.0",
+  "description": "A Datalog-driven, logic-based spreadsheet/database system powered by Natural Language Processing and awesomeness",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/christopherdumas/atomicdatabase.git"
+  },
+  "keywords": [
+    "datalog",
+    "logic",
+    "database",
+    "nlp"
+  ],
+  "author": "christopherdumas et al.",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/christopherdumas/atomicdatabase/issues"
+  },
+  "homepage": "https://github.com/christopherdumas/atomicdatabase#readme",
+  "dependencies": {
+    "@shieldsbetter/known": "0.0.1",
+    "compromise": "^8.2.0",
+    "csv": "^1.1.1",
+    "express": "^4.15.2"
+  }
+}
