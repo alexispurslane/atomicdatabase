@@ -4,7 +4,8 @@
   "description": "A Datalog-driven, logic-based spreadsheet/database system powered by Natural Language Processing and awesomeness",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "server": "node main.js"
   },
   "repository": {
     "type": "git",

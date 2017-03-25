@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "Logging changes for you!"
+git add . -A && git commit -m '$1' && git push
