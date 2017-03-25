@@ -2,6 +2,7 @@
 // Handle out of bound values (doesn't cause exceptions but still doesn't look good)
 // Tabbing goes to the next (and wraps around)
 // Enter = focusout
+// Reduce verbosity
 
 var input = "<input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
@@ -11,28 +12,41 @@ $(document).ready(function () {
 	for (var i = 0; i < 5; i++) {
 		s += fieldSlot;
 	}
-	s += "</tr> </thead>"
+	s += "</tr> </thead>";
 
 	$("table").prepend(s);
+	s = "<tr> "
+	for (var i = 0; i < 5; i++) {
+		s += fieldSlot;
+	}
+	s += "</tr>";
+	for (var i = 0; i < 4; i++)
+		$("tbody").append(s);
 
 	$(document.body).on('focusout', "input", function () {
-		var rowVal = $(this).parent().parent().children().first().children().first().val();
-		console.log(rowVal);
-		var colint = $(this).parent().index();
-		var colVal = $("#a").children().slice(colint, colint+1).val();
-		console.log(colVal);
 		$(this).addClass("disabled"); 
 		$(this).prop("readonly", true);
-		// var data = {
-		// 	'type': 'table',
-		// 	'text': $(this).val(),
-		// 	'tableUpdate': {
-
-		// 	}
-		// };
-		// $.post(document.baseURI, data, function(data) {
-		// 	console.log(data);
-		// })
+		if ($(this).parent().parent().attr('id') === "a") {
+			return;
+		}
+		var colint = $(this).parent().index();
+		if (colint == 0) return;
+		var rowVal = $(this).parent().parent().children().first().children().first().val();
+		console.log(rowVal);
+		var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
+		console.log(colVal);
+		var data = {
+			'type': 'table',
+			'text': $(this).val(),
+			'tableUpdate': {
+				'row': rowVal,
+				'col': colVal,
+				'value': $(this).val()
+			}
+		};
+		$.post(document.baseURI, data, function(data) {
+			console.log(data);
+		})
 	});
 
 	$(document.body).on('dblclick', ".disabled", function () {
