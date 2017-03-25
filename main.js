@@ -166,7 +166,7 @@ app.post('/', (req, res) => {
     case 'delete':
         const [att, ent] = [data.tableUpdate.col, data.tableUpdate.row];
         db = db.filter((el) => {
-            return el[0] === att && el[1] === ent;
+            return el[0] !== att && el[1] !== ent;
         });
         let n2db = db.filter((d) => Array.isArray(d));
         console.log(n2db);
