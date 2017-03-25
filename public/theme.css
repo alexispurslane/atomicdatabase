@@ -1,0 +1,8 @@
+.disabled {
+	box-shadow: none !important;
+	border: none !important;
+}
+
+.disabled[readonly] {
+	background-color: white;
+}
