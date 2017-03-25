@@ -36,9 +36,9 @@ $(document).ready(function () {
 		var colint = $(this).parent().index();
 		if (colint == 0) return;
 		var rowVal = $(this).parent().parent().children().first().children().first().val();
-		console.log(rowVal);
+		// console.log(rowVal);
 		var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
-		console.log(colVal);
+		// console.log(colVal);
 		var data = {
 			'type': 'table',
 			'text': $(this).val(),
@@ -79,10 +79,31 @@ $(document).ready(function () {
 			var row = prompt("Delete which row?");
 			if (row < 1) {
 				$status.html("ERROR: Cannot delete Row 1.");
+				return;
 			}
-			$("tr").slice(row, row+1).children().each(function () {
-				$(this).remove();
+			var delRow = $("tr")[row];
+			$(delRow).children().each(function () {
+				var colint = $(this).index();
+				if (colint == 0) return;
+				var colint = $(this).index();
+				var rowVal = $(this).parent().children().first().children().first().val();
+				// console.log(rowVal);
+				var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
+				// console.log(colVal);
+				var data = {
+					'type': 'delete',
+					'text': $(this).children().first().val(),
+					'tableUpdate': {
+						'row': rowVal,
+						'col': colVal,
+						'value': $(this).children().first().val()
+					}
+				};
+				$.post(document.baseURI, data, function(data) {
+					console.log(data);
+				});
 			});
+			$(delRow).remove();
 			$("#status").html("Row " + (row+1) + " deleted.");
 		}
 	});
