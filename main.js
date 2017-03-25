@@ -9,12 +9,12 @@
   }
 */
 
-const known = require("@shieldsbetter/known");
+const known = require('@shieldsbetter/known');
 const k = known.kfac;
 
 const sexp = require('s-expression');
 
-const nlp = require("compromise");
+const nlp = require('compromise');
 
 const fs = require('fs');
 const path = require('path');
@@ -29,35 +29,70 @@ const app = express();
 let db = [];
 let infers = [];
 let queries = [
-    "#Noun #Preposition #Noun",
-    "#Noun #Noun",
+    '#Noun #Preposition #Noun',
+    '#Noun #Noun',
 
     // Unification rules
-    "#Noun Noun #Copula (#Value|#Noun)",
-    "#Noun #Preposition #Noun #Copula (#Value|#Noun)",
+    '#Noun Noun #Copula (#Value|#Noun)',
+    '#Noun #Preposition #Noun #Copula (#Value|#Noun)',
 ];
 
-const addRule = (terms) => {
-    let expers = terms.map((term) => {
-        const newterm = term.map((exp) => {
-            if (exp[0].toUpperCase() === exp[0]) {
-                return k.placeholdeR(exp);
+const addRule = (buf, flag) => {
+    if (flag == 'sexp' || flag === undefined) {
+        const terms = sexp(buf);
+        let expers = terms.map((term) => {
+            const newterm = term.map((exp) => {
+                if (exp[0].toUpperCase() === exp[0]) {
+                    return k.placeholdeR(exp);
+                } else {
+                    return exp;
+                }
+            });
+
+            if (term[0] == 'and' || term[0] == 'or') {
+                const rest = newterm.slice(1);
+                return k[term[0]](...rest);
             } else {
-                return exp;
+                return newterm;
             }
         });
+        console.log(expers);
+        db.push(k.implies(
+            ...expers
+        ));
+    } else if (flag === 'natural') {
+        let rules = [];
+        const lines = buf.split('\n');
+        const matchers = queries.slice(2);
+        lines.forEach((line) => {
+            matchers.find((ms, matchingRule) => {
+                const match = nlp(line).match(ms);
+                if (match.found) {
+                    if (matchingRule == 2) {
+                        const [entity, attribute, _, value] = terms.data()[0];
 
-        if (term[0] == "and" || term[0] == "or") {
-            const rest = newterm.slice(1);
-            return k[term[0]](...rest);
-        } else {
-            return newterm;
-        }
-    });
-    console.log(expers);
-    db.push(k.implies(
-        ...expers
-    ));
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    } else if (matchingRule == 3) {
+                        const [attribute, prep, entity, _, value] = terms.data()[0];
+
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    }
+                    return true;
+                }
+                return false;
+            });
+        });
+
+        db.push(k.implies(...rules));
+    }
 };
 
 const satisfyQuery = (terms, matchingRule) => {
@@ -66,27 +101,26 @@ const satisfyQuery = (terms, matchingRule) => {
         const [attribute, _, entity] = terms.data()[0];
         console.log([attribute.normal, entity.normal]);
 
-        request = k.and([attribute.normal, entity.normal,
-                         k.placeholder(uuidV4())]);
+        request = [attribute.normal, entity.normal, k.placeholder(uuidV4())];
     } else if (matchingRule == 1) {
         const [entity, attribute] = terms.data()[0];
         console.log([attribute.normal, entity.normal]);
 
-        request = k.and([attribute.normal, entity.normal.replace("'s", ""),
-                         k.placeholder(uuidV4())]);
+        request = [attribute.normal, entity.normal.replace('\'s', ''),
+                   k.placeholder(uuidV4())];
     } else if (matchingRule == 2) {
         const [entity, attribute, _, value] = terms.data()[0];
         console.log([attribute.normal, entity.normal, value.normal]);
 
-        request = k.and([attribute.normal, entity.normal, value.normal]);
+        request = [attribute.normal, entity.normal, value.normal];
     } else if (matchingRule == 3) {
         const [attribute, prep, entity, _, value] = terms.data()[0];
         console.log([attribute.normal, entity.normal, value.normal]);
 
-        request = k.and([attribute.normal, entity.normal, value.normal]);
+        request = [attribute.normal, entity.normal, value.normal];
     }
 
-    return k.findValiuations(request, known.dbsize(db));
+    return k.findValiuations(...request, known.dbsize(db));
 };
 
 // Handle requests
@@ -101,7 +135,7 @@ app.post('/', (req, res) => {
         const [a, e, v] = [data.tableUpdate.col,
                            data.tableUpdate.row,
                            data.tableUpdate.value];
-        if (typeof a !== "string" && typeof e !== "string" && typeof v !== "string" &&
+        if (typeof a !== 'string' && typeof e !== 'string' && typeof v !== 'string' &&
             a === '' && e === '' && v === '') {
             res.send({
                 success: false,
@@ -163,7 +197,7 @@ app.post('/', (req, res) => {
         break;
 
     case 'rule':
-        const successful = addRule(sexp(data.text));
+        const successful = addRule(data.text, data.flag);
         res.send({
             success: successful,
             updated: 'database',
