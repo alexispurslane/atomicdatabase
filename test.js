@@ -9,3 +9,9 @@ stdin.addListener("data", function(d) {
         console.log(d.bestTag+": "+d.normal+" ("+d.tags.join(", ")+")");
     });
 });
+
+/*
+  (father Person Parent)
+  (father Parent Grandparent)
+  (grandfather Person Grandparent)
+*/
