@@ -1,21 +1,38 @@
 // TODO:
 // Handle out of bound values (doesn't cause exceptions but still doesn't look good)
+// Tabbing goes to the next (and wraps around)
+// Enter = focusout
 
 var input = "<input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
 
 $(document).ready(function () {
-	var s = "<tr id=\"a\"> "
+	var s = "<thead> <tr id=\"a\"> "
 	for (var i = 0; i < 5; i++) {
 		s += fieldSlot;
 	}
-	s += "</tr>"
+	s += "</tr> </thead>"
 
-	$("#tbl").html(s);
+	$("table").prepend(s);
 
 	$(document.body).on('focusout', "input", function () {
+		var rowVal = $(this).parent().parent().children().first().children().first().val();
+		console.log(rowVal);
+		var colint = $(this).parent().index();
+		var colVal = $("#a").children().slice(colint, colint+1).val();
+		console.log(colVal);
 		$(this).addClass("disabled"); 
 		$(this).prop("readonly", true);
+		// var data = {
+		// 	'type': 'table',
+		// 	'text': $(this).val(),
+		// 	'tableUpdate': {
+
+		// 	}
+		// };
+		// $.post(document.baseURI, data, function(data) {
+		// 	console.log(data);
+		// })
 	});
 
 	$(document.body).on('dblclick', ".disabled", function () {
@@ -32,7 +49,7 @@ $(document).ready(function () {
 		}
 		str += "</tr>"
 
-		$("tr:last").after(str);
+		$("tbody").append(str);
 	});
 
 	$("#del-row").click(function () {
