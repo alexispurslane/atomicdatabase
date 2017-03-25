@@ -1,24 +1,27 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-	<title>Atomic Database</title>
-	<link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
-	<link rel="stylesheet" type="text/css" href="theme.css">
-	<script src="./js/jquery-3.2.0.min.js"></script>
-	<script src="frontend.js"></script>
-</head>
-<body>
-	<h1>Atomic Database</h1>
-	<table class="table table-bordered">
-		<tbody id="tbl"></tbody>
-	</table>
-	<div class="table-control">
-		<button class="btn btn-primary" id="add-row">Add Row</button>
-		<button class="btn btn-danger"  id="del-row">Delete Row</button>
-		<span style="width: 80px; display:inline-block;"></span>
-		<button class="btn btn-primary" id="add-col">Add Column</button>
-		<button class="btn btn-danger"  id="del-col">Delete Column</button>
-	</div>
-	<div id="status">Ready.</div>
-</body>
+    <head>
+        <title>Atomic Database</title>
+        <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
+        <link rel="stylesheet" type="text/css" href="theme.css">
+        <script src="./js/jquery-3.2.0.min.js"></script>
+        <script src="frontend.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    </head>
+    <body>
+        <h1>Atomic Database</h1>
+        <div class="container-fluid">
+            <table class="table table-bordered table-hover table-condensed">
+                <tbody id="tbl"></tbody>
+            </table>
+
+            <div class="table-control">
+                <button class="btn btn-primary" id="add-row">Add Row</button>
+                <button class="btn btn-danger"  id="del-row">Delete Row</button>
+                <span style="width: 80px; display:inline-block;"></span>
+                <button class="btn btn-primary" id="add-col">Add Column</button>
+                <button class="btn btn-danger"  id="del-col">Delete Column</button>
+            </div>
+        </div>
+    </body>
 </html>

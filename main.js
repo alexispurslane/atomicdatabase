@@ -94,7 +94,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
-app.post('/table', (req, res) => {
+app.post('/', (req, res) => {
     var data = req.body;
     switch (data.type) {
     case 'table':
