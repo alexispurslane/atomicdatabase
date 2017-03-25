@@ -1,8 +1,12 @@
 .disabled {
-	box-shadow: none !important;
-	border: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .disabled[readonly] {
-	background-color: white;
+    background-color: white !important;
+}
+
+.container-fluid {
+    padding-top: 65px !important;
 }

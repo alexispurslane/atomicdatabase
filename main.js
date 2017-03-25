@@ -108,7 +108,6 @@ app.post('/', (req, res) => {
                 updated: 'database'
             });
             return;
-
         }
         let alreadyPresent = false;
         db.forEach((el, i, db) => {
