@@ -112,7 +112,7 @@ app.post('/', (req, res) => {
             db.push([a, e, v]);
         }
 
-        console.log(db.filter((d) => d.isArray()));
+        console.log(db.filter((d) => Array.isArray(d)));
         res.send({
             success: true,
             updated: 'database',
