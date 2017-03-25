@@ -25,8 +25,10 @@
   "homepage": "https://github.com/christopherdumas/atomicdatabase#readme",
   "dependencies": {
     "@shieldsbetter/known": "0.0.1",
+    "body-parser": "^1.17.1",
     "compromise": "^8.2.0",
     "csv": "^1.1.1",
-    "express": "^4.15.2"
+    "express": "^4.15.2",
+    "uuid": "^3.0.1"
   }
 }

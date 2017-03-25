@@ -4,7 +4,7 @@
 
 1. Listen for JSON queries from the database (including facts and queries)
 2. Listen for NL query-equations for inferences from the front end
-3. Send inferences or data back in JSON.
+5. Send inferences or data back in JSON.
 
 ## layer two
 
@@ -17,7 +17,9 @@
 
 1. Have massive table interface (similar to excel) that can be
 converted into JSON AEV-triples
-2. Have a text-box for entering query equations.
+2. Have a text-box for entering query equations. When the user hits enter or clicks the 'Compute' button, send message to server.
 3. Unknowns in the table (parenthisized words) should be, when solved,
 changed into their correct answer.
 4. Solve button on the bottom of the screen.
+5. When table cell is double-clicked, change cell contents to a textbox with the originoal text of the cell.
+6. When user clicks out of cell after double-clicking it, change the cell back to regular text with the contents of the textbox. Send the server a message with the changes.
