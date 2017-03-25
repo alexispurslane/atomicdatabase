@@ -135,8 +135,8 @@ app.post('/', (req, res) => {
         const [a, e, v] = [data.tableUpdate.col,
                            data.tableUpdate.row,
                            data.tableUpdate.value];
-        if (typeof a !== 'string' && typeof e !== 'string' && typeof v !== 'string' &&
-            a === '' && e === '' && v === '') {
+        if (typeof a !== 'string' || typeof e !== 'string' || typeof v !== 'string' ||
+            a === '' || e === '' || v === '') {
             res.send({
                 success: false,
                 updated: 'database'
@@ -218,5 +218,5 @@ app.post('/', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public/')));
 
 app.listen(3000, function () {
-    console.log('Example app listening on port http://localhost:3000!');
+    console.log('AtomicDatabase bombing you on port http://localhost:3000!');
 });
