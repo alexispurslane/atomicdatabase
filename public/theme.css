@@ -10,3 +10,7 @@
 .container-fluid {
     padding-top: 65px !important;
 }
+
+table > thead > tr > td > input {
+    font-weight: bold !important;
+}
