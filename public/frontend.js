@@ -4,13 +4,14 @@
 // Enter = focusout
 // Reduce verbosity
 
-var input = "<input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input>";
+var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
+var $status = $("#status");
 
 $(document).ready(function () {
 	var s = "<thead> <tr id=\"a\"> "
 	for (var i = 0; i < 5; i++) {
-		s += fieldSlot;
+		s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
 	}
 	s += "</tr> </thead>";
 
@@ -23,12 +24,15 @@ $(document).ready(function () {
 	for (var i = 0; i < 4; i++)
 		$("tbody").append(s);
 
-	$(document.body).on('focusout', "input", function () {
+	$(document.body).on('focusout', "input:not(.query)", function () {
 		$(this).addClass("disabled"); 
 		$(this).prop("readonly", true);
-		if ($(this).parent().parent().attr('id') === "a") {
+		if (!$(this).hasClass("field")) {
 			return;
 		}
+		// if ($(this).parent().parent().attr('id') === "a") {
+		// 	return;
+		// }
 		var colint = $(this).parent().index();
 		if (colint == 0) return;
 		var rowVal = $(this).parent().parent().children().first().children().first().val();
@@ -72,8 +76,13 @@ $(document).ready(function () {
 			return;
 		}
 		if (confirm("Are you sure you want to delete a row?")) {
-			var row = prompt("Delete which row?")-1;
-			$("tr").get(row).remove();
+			var row = prompt("Delete which row?");
+			if (row < 1) {
+				$status.html("ERROR: Cannot delete Row 1.");
+			}
+			$("tr").slice(row, row+1).children().each(function () {
+				$(this).remove();
+			});
 			$("#status").html("Row " + (row+1) + " deleted.");
 		}
 	});
@@ -88,9 +97,9 @@ $(document).ready(function () {
 			return;
 		}
 		if (confirm("Are you sure you want to delete a column?")) {
-			var col = prompt("Delete which column?")-1;
+			var col = prompt("Delete which column?")-2;
 			$("tr").each(function () {
-				$(this).children().slice(col, col+1).remove();
+				$(this).children()[col].remove();
 			});
 			$("#status").html("Row " + (col+1) + " deleted.");
 		}
