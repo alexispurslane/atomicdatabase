@@ -29,12 +29,17 @@
                 <tbody id="tbl"></tbody>
             </table>
 
-            <div class="table-control">
+            <div class="table-control" style="padding: 5px; width:100%; position: fixed; bottom: 0;">
                 <button class="btn btn-primary" id="add-row">Add Row</button>
                 <button class="btn btn-danger"  id="del-row">Delete Row</button>
-                <span style="width: 80px; display:inline-block;"></span>
                 <button class="btn btn-primary" id="add-col">Add Column</button>
                 <button class="btn btn-danger"  id="del-col">Delete Column</button>
+                <div class="input-group">
+                    <span class="input-group-btn">
+                        <button class="btn btn-success" type="button">Solve!</button>
+                    </span>
+                    <input type="text" class="form-control" placeholder="Enter a query..." style="float: right; width: 40%; padding-right: 5px;">
+                </div>
             </div>
         </div>
     </body>
