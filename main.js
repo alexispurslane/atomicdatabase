@@ -101,6 +101,15 @@ app.post('/', (req, res) => {
         const [a, e, v] = [data.tableUpdate.col,
                            data.tableUpdate.row,
                            data.tableUpdate.value];
+        if (typeof a !== "string" && typeof e !== "string" && typeof v !== "string" &&
+            a === '' && e === '' && v === '') {
+            res.send({
+                success: false,
+                updated: 'database'
+            });
+            return;
+
+        }
         let alreadyPresent = false;
         db.forEach((el, i, db) => {
             if (a == el[0] && e == el[1]) {
@@ -112,11 +121,12 @@ app.post('/', (req, res) => {
             db.push([a, e, v]);
         }
 
-        console.log(db.filter((d) => Array.isArray(d)));
+        let ndb = db.filter((d) => Array.isArray(d));
+        console.log(ndb);
         res.send({
             success: true,
             updated: 'database',
-            data: db.filter((d) => d.isArray())
+            data: ndb
         });
         break;
 
@@ -124,6 +134,13 @@ app.post('/', (req, res) => {
         const [att, ent] = [data.tableUpdate.col, data.tableUpdate.row];
         db = db.filter((el) => {
             return el[0] !== att && el[1] !== ent;
+        });
+        let n2db = db.filter((d) => Array.isArray(d));
+        console.log(n2db);
+        res.send({
+            success: true,
+            updated: 'database',
+            data: n2db
         });
         break;
 
