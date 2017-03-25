@@ -12,6 +12,8 @@
 const known = require("@shieldsbetter/known");
 const k = known.kfac;
 
+const sexp = require('s-expression');
+
 const nlp = require("compromise");
 
 const fs = require('fs');
@@ -35,30 +37,52 @@ let queries = [
     "#Noun #Preposition #Noun #Copula (#Value|#Noun)",
 ];
 
-let rules = [
-    // Recursively parse the "*"
-    "#Determiner? #Noun #Preposition (#Noun|#Acronym)+ #Copula *"
-];
+const addRule = (terms) => {
+    let expers = terms.map((term) => {
+        const newterm = term.map((exp) => {
+            if (exp[0].toUpperCase() === exp[0]) {
+                return k.placeholdeR(exp);
+            } else {
+                return exp;
+            }
+        });
 
-const addRule = (terms, matchingRule) => {
-
+        if (term[0] == "and" || term[0] == "or") {
+            const rest = newterm.slice(1);
+            return k[term[0]](...rest);
+        } else {
+            return newterm;
+        }
+    });
+    console.log(expers);
+    db.push(k.implies(
+        ...expers
+    ));
 };
 
 const satisfyQuery = (terms, matchingRule) => {
     let request;
     if (matchingRule == 0) {
         const [attribute, _, entity] = terms.data()[0];
+        console.log([attribute.normal, entity.normal]);
+
         request = k.and([attribute.normal, entity.normal,
                          k.placeholder(uuidV4())]);
     } else if (matchingRule == 1) {
         const [entity, attribute] = terms.data()[0];
+        console.log([attribute.normal, entity.normal]);
+
         request = k.and([attribute.normal, entity.normal.replace("'s", ""),
                          k.placeholder(uuidV4())]);
     } else if (matchingRule == 2) {
         const [entity, attribute, _, value] = terms.data()[0];
+        console.log([attribute.normal, entity.normal, value.normal]);
+
         request = k.and([attribute.normal, entity.normal, value.normal]);
     } else if (matchingRule == 3) {
         const [attribute, prep, entity, _, value] = terms.data()[0];
+        console.log([attribute.normal, entity.normal, value.normal]);
+
         request = k.and([attribute.normal, entity.normal, value.normal]);
     }
 
@@ -116,16 +140,9 @@ app.post('/table', (req, res) => {
         break;
 
     case 'rule':
-        const found = rules.find((ms, i) => {
-            let match = nlp(data.text).match(ms);
-            if (match.found) {
-                addRule(match.terms(), i);
-                return true;
-            }
-            return false;
-        });
+        const successful = addRule(sexp(data.text));
         res.send({
-            success: !!found,
+            success: successful,
             updated: 'database',
             data: null
         });

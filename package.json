@@ -29,6 +29,7 @@
     "compromise": "^8.2.0",
     "csv": "^1.1.1",
     "express": "^4.15.2",
+    "s-expression": "^3.0.3",
     "uuid": "^3.0.1"
   }
 }
