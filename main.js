@@ -7,7 +7,6 @@ const k = known.kfac;
 const nlp = require("compromise");
 
 const fs = require('fs');
-const csv = require('csv');
 
 const express = require('express');
 const app = express();
