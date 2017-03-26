@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Atomic Database</title>
+        <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
+        <link rel="stylesheet" type="text/css" href="theme.css">
+        <script src="./js/jquery-3.2.0.min.js"></script>
+        <script src="frontend.js"></script>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    </head>
+    <body>
+        <nav class="navbar navbar-default navbar-fixed-top">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#">AtomicDatabase</a>
+            </div>
+            <ul class="nav navbar-nav navbar-left">
+                <li class="active"><a href="#">Facts</a></li>
+                <li><a href="rules.html">Rules</a></li>
+            </ul>
+        </nav>
+        <div class="container-fluid">
+            <table class="table table-bordered table-hover table-condensed">
+                <tbody id="tbl"></tbody>
+            </table>
+
+            <div class="table-control" style="padding: 5px; width:100%; position: fixed; bottom: 50px;">
+                <button class="btn btn-primary" id="add-row">Add Row</button>
+                <button class="btn btn-danger"  id="del-row">Delete Row</button>
+                <button class="btn btn-primary" id="add-col">Add Column</button>
+                <button class="btn btn-danger"  id="del-col">Delete Column</button>
+                <div class="input-group" style="float: right; width: 40%; padding-right: 5px;">
+                    <input type="text" class="query form-control" placeholder="Enter a query...">
+                    <span class="input-group-btn">
+                        <button class="btn btn-success" id="solve" type="button">Solve!</button>
+                    </span>
+                </div>
+                <pre id="status" style="display: block; width: 100%; padding-right: 5px;">Ready.</pre>
+            </div>
+        </div>
+    </body>
+</html>

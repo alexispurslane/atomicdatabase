@@ -7,6 +7,8 @@
 var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
 
+var BreakException = {};
+
 $(document).ready(function () {
 	var $status = $("#status");
 
@@ -26,6 +28,82 @@ $(document).ready(function () {
 	s += "</tr>";
 	for (var i = 0; i < 4; i++)
 		$("tbody").append(s);
+
+	// On each reload: Load data
+	var reloadRequest = {
+		'type': 'reload'
+	}
+	$.post(document.baseURI, reloadRequest, function (data) {
+		var actualData = data.data;
+		var attrOrder = Object.entries(actualData.attrOrder);
+		var entityOrder = Object.entries(actualData.entityOrder);
+		var database = actualData.database;
+		if (attrOrder.length === 0 || entityOrder.length === 0 || database.length === 0) return;
+		var numColsToAdd = attrOrder.length - 4;
+		if (numColsToAdd > 0)
+			for (var i = 0; i < numColsToAdd; i++) {
+				addCol();
+			}
+		else if (numColsToAdd < 0)
+			for (var i = 0; i > numColsToAdd; i--) {
+				delColBypass();
+			}
+		var numRowsToAdd = entityOrder.length - 4;
+		if (numRowsToAdd > 0)
+			for (var i = 0; i < numRowsToAdd; i++) {
+				addRow();
+			}
+		else if (numRowsToAdd < 0)
+			for (var i = 0; i > numRowsToAdd; i--) {
+				delRowBypass();
+			}
+		// console.log(attrOrder);
+		$("#a").children().each(function () {
+			var item = $(this);
+			var index = item.index();
+			if (index === 0) return;
+			
+			attrOrder.forEach(function (e) {
+				if (+e[1] === index) {
+					item.children().first().val(e[0]);
+				}
+			});
+		});
+		$("tbody").children().each(function () {
+			var item = $(this).children().first();
+			var index = $(this).index();
+
+			entityOrder.forEach(function (e) {
+				if (+e[1] === index) {
+					if (e[0].toString() === "[object Object]") {
+						delRowBypass();
+						return;
+					}
+					item.children().first().val(e[0]);
+				}
+			});
+		});
+		console.log(entityOrder);
+		console.log(database);
+		$("tbody").children().each(function () {
+			var row = $(this);
+			database.forEach(function (e) {
+				console.log(row.children().first().children().first().val());
+				if (row.children().first().children().first().val() === e[1]) {
+					row.children().each(function () {
+						var item = $(this);
+						var index = item.index();
+						// if (index === 0) return;
+						console.log(index);
+						if (e[0] === $($("#a").children()[index]).children().first().val()) {
+							item.children().first().val(e[2]);
+							return;
+						}
+					});
+				}
+			})
+		});
+	});
 
 	$(document.body).on('focusout', "input:not(.query)", function () {
 		$(this).addClass("disabled"); 
@@ -62,7 +140,7 @@ $(document).ready(function () {
 		$(this).prop("readonly", false);
 	});
 
-	$("#add-row").click(function () {
+	var addRow = function () {
 		var cols = $("td").length / $("tr").length;
 
 		var str = "<tr> "
@@ -73,9 +151,16 @@ $(document).ready(function () {
 
 		$("tbody").append(str);
 		$status.text("Row added.");
-	});
+	}
 
-	$("#del-row").click(function () {
+	$("#add-row").click(addRow);
+
+	var delRowBypass = function () {
+		if ($("tr").length < 2) return;
+		$("tr").last().remove();
+	}
+
+	var delRow = function () {
 		if ($("tr").length < 2) {
 			$status.text("ERROR: Cannot delete only row.");
 			return;
@@ -100,8 +185,8 @@ $(document).ready(function () {
 					'type': 'delete-row',
 					'text': $(this).children().first().val(),
 					'tableUpdate': {
-						'row': {"index": row, "value": row},
-						'col': {"index": colint, "value": colVal},
+						'row': rowVal,
+						'col': colVal,
 						'value': $(this).children().first().val()
 					}
 				};
@@ -112,14 +197,25 @@ $(document).ready(function () {
 			$(delRow).remove();
 			$status.text("Row " + row + " deleted.");
 		}
-	});
+	}
 
-	$("#add-col").click(function () {
+	$("#del-row").click(delRow);
+
+	var addCol = function () {
 		$("tr").append(fieldSlot);
 		$status.text("Column added.");
-	});
+	}
 
-	$("#del-col").click(function () {
+	$("#add-col").click(addCol);
+
+	var delColBypass = function () {
+		if ($("td").length / $("tr").length < 2) return;
+		$("tr").each(function () {
+			$(this).children().last().remove();
+		});
+	}
+
+	var delCol = function () {
 		if ($("td").length / $("tr").length < 2) {
 			$status.text("ERROR: Cannot delete only column.");
 			return;
@@ -145,8 +241,8 @@ $(document).ready(function () {
 					'type': 'delete-col',
 					'text': $(delCol).children().first().val(),
 					'tableUpdate': {
-						'row': {"index": rowint, "value": rowVal},
-						'col': {"index": col, "value": col},
+						'row': rowVal,
+						'col': colVal,
 						'value': $(delCol).children().first().val()
 					}
 				};
@@ -158,7 +254,9 @@ $(document).ready(function () {
 			$("#a").children()[col].remove();
 			$status.text("Column " + col + " deleted.");
 		}
-	});
+	}
+
+	$("#del-col").click(delCol);
 
 	$("#solve").click(function () {
 		var data = {
