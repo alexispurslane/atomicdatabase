@@ -7,10 +7,21 @@
     background-color: white !important;
 }
 
+input[disabled] {
+	background-color: white !important;
+	box-shadow: none !important;
+	border: none !important;
+}
+
 .container-fluid {
     padding-top: 65px !important;
 }
 
 table > thead > tr > td > input {
     font-weight: bold !important;
+}
+
+#status {
+	position: fixed;
+	bottom: 0;
 }

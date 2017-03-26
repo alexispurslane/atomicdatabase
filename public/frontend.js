@@ -6,16 +6,19 @@
 
 var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
-var $status = $("#status");
 
 $(document).ready(function () {
+	var $status = $("#status");
+
 	var s = "<thead> <tr id=\"a\"> "
 	for (var i = 0; i < 5; i++) {
 		s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
 	}
 	s += "</tr> </thead>";
-
 	$("table").prepend(s);
+	$("input").first().prop("disabled", true);
+	$("input").first().prop("readonly", false);
+
 	s = "<tr> "
 	for (var i = 0; i < 5; i++) {
 		s += fieldSlot;
@@ -68,17 +71,18 @@ $(document).ready(function () {
 		str += "</tr>"
 
 		$("tbody").append(str);
+		$status.text("Row added.");
 	});
 
 	$("#del-row").click(function () {
 		if ($("tr").length < 2) {
-			$("#status").html("ERROR: Cannot delete only row.");
+			$status.text("ERROR: Cannot delete only row.");
 			return;
 		}
 		if (confirm("Are you sure you want to delete a row?")) {
 			var row = prompt("Delete which row?");
 			if (row < 1) {
-				$status.html("ERROR: Cannot delete Row 1.");
+				$status.text("ERROR: Cannot delete Row 1.");
 				return;
 			}
 			var delRow = $("tr")[row];
@@ -90,12 +94,12 @@ $(document).ready(function () {
 				// console.log(rowVal);
 				var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
 				// console.log(colVal);
+				console.log([colVal, rowVal, $(this).children().first().val()]);
 				var data = {
-					'type': 'delete',
+					'type': 'delete-row',
 					'text': $(this).children().first().val(),
 					'tableUpdate': {
 						'row': rowVal,
-						'col': colVal,
 						'value': $(this).children().first().val()
 					}
 				};
@@ -104,25 +108,30 @@ $(document).ready(function () {
 				});
 			});
 			$(delRow).remove();
-			$("#status").html("Row " + (row+1) + " deleted.");
+			$status.text("Row " + (row+1) + " deleted.");
 		}
 	});
 
 	$("#add-col").click(function () {
 		$("tr").append(fieldSlot);
+		$status.text("Column added.");
 	});
 
 	$("#del-col").click(function () {
 		if ($("td").length / $("tr").length < 2) {
-			$("#status").html("ERROR: Cannot delete only column.");
+			$status.text("ERROR: Cannot delete only column.");
 			return;
 		}
 		if (confirm("Are you sure you want to delete a column?")) {
-			var col = prompt("Delete which column?")-2;
+			var col = prompt("Delete which column?");
+			if (col < 1) {
+				$status.text("ERROR: Cannot delete Column 1.");
+				return;
+			}
 			$("tr").each(function () {
 				$(this).children()[col].remove();
 			});
-			$("#status").html("Row " + (col+1) + " deleted.");
+			$status.text("Row " + (col+1) + " deleted.");
 		}
 	});
 });
