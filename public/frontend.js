@@ -161,7 +161,7 @@ $(document).ready(function () {
 	$("#solve").click(function () {
 		var data = {
 			'type': 'query',
-			'text': $(this).val()
+			'text': $(".query").first().val()
 		}
 		$.post(document.baseURI, data, function(data) {
 			console.log(data);
