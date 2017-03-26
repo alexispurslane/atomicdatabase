@@ -1,6 +1,6 @@
 function addRule(title, body) {
-    $(".rules").append('<div class="rule">\
-        <h1><input style="font-size: 36px;height:38px;" value="'+title+'" type="text" class="form-control"/></h1>\
+    $(".rules").append('<div class="rule list-group-item">\
+        <h4 class="list-group-item-heading"><input style="font-size: inherit;" value="'+title+'" type="text" class="form-control"/></h1>\
         <textarea cols=80 rows=15 style="font-family: monospace;" class="form-control">'+body+'</textarea>\
         <button class="btn btn-success submit" type="button" style="width: 100%;"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span></button>\
       </div>');
