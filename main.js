@@ -286,7 +286,7 @@ var options = {
         res.header('Cache-Control', 'public, max-age=1d');
     }
 };
-app.use(express.static(path.join(__dirname, 'public/', options)));
+app.use(express.static(path.join(__dirname, 'public/'), options));
 
 app.listen(3000, function () {
     console.log('AtomicDatabase bombing you on port http://localhost:3000!');
