@@ -35,7 +35,9 @@ let entities = {};
 let queries = [
     // Unification rules
     '#Noun #Preposition #Noun #Copula (#Value|#Noun)',
-    '#Noun Noun #Copula (#Value|#Noun)',
+    '#Copula #Noun #Noun (#Value|#Noun)',
+    '#Copula #Noun #Preposition #Noun (#Value|#Noun)',
+    '#Noun #Noun #Copula (#Value|#Noun)',
 
     // Question rules
     '#Noun #Preposition #Noun',
@@ -102,27 +104,26 @@ const addRule = (buf, flag) => {
 
 const satisfyQuery = (terms, matchingRule) => {
     let request;
-    if (matchingRule == 0) {
+    if (matchingRule == 4) {
         const [attribute, _, entity] = terms.data();
-        console.log([attribute.normal, entity.normal]);
-
-        request = [attribute.normal, entity.normal, k.placeholder(uuidV4())];
-    } else if (matchingRule == 1) {
-        const [entity, attribute] = terms.data();
-        console.log([attribute.normal, entity.normal]);
-
         request = [attribute.normal, entity.normal.replace('\'s', ''),
                    k.placeholder(uuidV4())];
-    } else if (matchingRule == 2) {
-        const [entity, attribute, _, value] = terms.data();
-        console.log([attribute.normal, entity.normal, value.normal]);
-
-        request = [attribute.normal, entity.normal, value.normal];
+    } else if (matchingRule == 5) {
+        const [entity, attribute] = terms.data();
+        request = [attribute.normal, entity.normal.replace('\'s', ''),
+                   k.placeholder(uuidV4())];
     } else if (matchingRule == 3) {
+        const [entity, attribute, _, value] = terms.data();
+        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
+    } else if (matchingRule == 0) {
         const [attribute, prep, entity, _, value] = terms.data();
-        console.log([attribute.normal, entity.normal, value.normal]);
-
-        request = [attribute.normal, entity.normal, value.normal];
+        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
+    } else if (matchingRule == 1) {
+        const [cop, attribute, entity, value] = terms.data();
+        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
+    } else if (matchingRule == 2) {
+        const [cop, entity, prep, attribute, value] = terms.data();
+        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
     }
 
     console.log(request);
