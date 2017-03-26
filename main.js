@@ -75,17 +75,43 @@ const addRule = (buf, flag) => {
             matchers.find((ms, matchingRule) => {
                 const match = nlp(line).match(ms);
                 if (match.found) {
-                    if (matchingRule == 2) {
-                        const [entity, attribute, _, value] = terms.data();
-
+                    if (matchingRule == 4) {
+                        const [attribute, _, entity] = terms.data();
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    } else if (matchingRule == 5) {
+                        const [entity, attribute] = terms.data();
                         let v = value.normal;
                         if (value.bestTag === 'TitleCase') {
                             v = k.placeholder(value.normal);
                         }
                         rules.push([attribute.normal, entity.normal, v]);
                     } else if (matchingRule == 3) {
+                        const [entity, attribute, _, value] = terms.data();
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    } else if (matchingRule == 0) {
                         const [attribute, prep, entity, _, value] = terms.data();
-
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    } else if (matchingRule == 1) {
+                        const [cop, attribute, entity, value] = terms.data();
+                        let v = value.normal;
+                        if (value.bestTag === 'TitleCase') {
+                            v = k.placeholder(value.normal);
+                        }
+                        rules.push([attribute.normal, entity.normal, v]);
+                    } else if (matchingRule == 2) {
+                        const [cop, entity, prep, attribute, value] = terms.data();
                         let v = value.normal;
                         if (value.bestTag === 'TitleCase') {
                             v = k.placeholder(value.normal);
