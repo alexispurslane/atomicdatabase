@@ -266,9 +266,18 @@ $(document).ready(function () {
         };
         $.post(baseURI, data, function(data) {
             console.log(data);
-            var response = data.data[0];
-            $status.text("The answer is: " + Object.values(response)[0].toString());
+            if (data.success) {
+                if (data.data.length > 0) {
+                    var str = data.data.map(
+                        (r) =>
+                            Object.values(response)[0].toString()).join(", ");
+                    $status.text("The answers are: ");
+                } else {
+                    $status.text("I don't know enough to answer this question. Either I need more data or one of your rules was incorrect.");
+                }
+            } else {
+                $status.text("I didn't understand that query.");
+            }
         });
-
     });
 });

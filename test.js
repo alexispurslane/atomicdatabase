@@ -4,12 +4,13 @@ const kfac = known.factory;
 var db = [
     ['father', 'tom', 'barry'],
     ['father', 'barry', 'joe'],
+    ['father', 'tim', 'joe'],
     kfac.implies(
-        kfac.and(['father', kfac.placeholder('x'), kfac.placeholder('y')],
-                 ['father', kfac.placeholder('y'), kfac.placeholder('z')]),
-        ['grandfather', kfac.placeholder('x'), kfac.placeholder('z')]
+        kfac.and(['father', kfac.placeholder('a'), kfac.placeholder('f')],
+                 ['father', kfac.placeholder('b'), kfac.placeholder('f')]),
+        ['sibling', kfac.placeholder('a'), kfac.placeholder('b')]
     )
 ];
 
-console.log(known.findValuations(['grandfather', 'tom', kfac.placeholder('person')],
+console.log(known.findValuations(['sibling', 'barry', kfac.placeholder('person')],
                                  known.dbize(db)));

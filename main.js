@@ -74,6 +74,7 @@ const addRule = (title, buf, flag) => {
         db.push(k.implies(
             ...expers
         ));
+        return expers;
     } else if (flag === 'natural') {
         let rules = [];
         const lines = buf.split('\n');
@@ -125,7 +126,7 @@ const addRule = (title, buf, flag) => {
                         }
                         rules.push([attribute.normal, entity.normal, v]);
                     }
-                    return true;
+                    return rules;
                 }
                 return false;
             });
@@ -298,10 +299,11 @@ app.post('/', (req, res) => {
     case 'rule':
         const successful = addRule(data.title, data.text, data.flag);
         rules[data.title] = data;
+
         res.send({
-            success: successful,
+            success: !!successful,
             updated: 'rules',
-            data: null
+            data: successful
         });
         break;
 
