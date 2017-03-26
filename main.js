@@ -239,6 +239,7 @@ app.post('/', (req, res) => {
 
     case 'query':
         const foundQuery = null;
+        console.log(data.text);
 
         queries.find((ms, i) => {
             console.log("Testing format " + i + ": " + ms);

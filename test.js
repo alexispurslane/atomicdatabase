@@ -1,7 +1,7 @@
 const nlp = require("compromise");
 const process = require("process");
 
-console.log(nlp("What is the age of Wrex?").match("#Noun #Preposition #Noun").found);
+console.log(nlp(process.argv[2]).match(process.argv[3]).found);
 /*
   (father Person Parent)
   (father Parent Grandparent)
