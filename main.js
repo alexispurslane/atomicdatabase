@@ -124,6 +124,7 @@ const satisfyQuery = (terms, matchingRule) => {
         request = [attribute.normal, entity.normal, value.normal];
     }
 
+    console.log(request);
     return k.findValiuations(...request, known.dbsize(db));
 };
 
