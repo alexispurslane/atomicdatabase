@@ -240,9 +240,12 @@ app.post('/', (req, res) => {
         const foundQuery = null;
 
         queries.find((ms, i) => {
+            console.log("Testing format " + i + ": " + ms);
             let match = nlp(data.text).match(ms);
             if (match.found) {
+                console.log("Sentence matched!");
                 foundQuery = satisfyQuery(match.terms(), i);
+                console.log("Result is: " + foundQuery);
                 return true;
             }
             return false;
