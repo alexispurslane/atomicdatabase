@@ -33,12 +33,13 @@ let attrs = {};
 let entities = {};
 
 let queries = [
+    // Unification rules
+    '#Noun #Preposition #Noun #Copula (#Value|#Noun)',
+    '#Noun Noun #Copula (#Value|#Noun)',
+
+    // Question rules
     '#Noun #Preposition #Noun',
     '#Noun #Noun',
-
-    // Unification rules
-    '#Noun Noun #Copula (#Value|#Noun)',
-    '#Noun #Preposition #Noun #Copula (#Value|#Noun)',
 ];
 
 const addRule = (buf, flag) => {
