@@ -7,6 +7,8 @@
   'text': ...,
   'tableUpdate': { 'row': ..., 'col': ..., 'value': ...}
   }
+
+  { 'index': ..., 'value': ... }
 */
 
 const known = require('@shieldsbetter/known');
