@@ -11,7 +11,7 @@
   { 'index': ..., 'value': ... }
 */
 
-// Final entry does NOT work
+// Final entry sometimes does not work
 
 const known = require('@shieldsbetter/known');
 const k = known.factory;

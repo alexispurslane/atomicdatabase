@@ -1,7 +1,9 @@
 $(document).ready(function () {
-    $(".submit").click(function () {
-        var n = $(".submit").index($(this));
-        var text = $("textarea").get(n-1).value;
+    $(document.body).on('click', ".submit", function () {
+        var submit = $($($(this).parent().children()[0]).children()[0]);
+        var txtarea = $($(this).parent().children()[1]);
+        var n = submit.index($(this));
+        var text = txtarea.val();
         console.log(n-1);
 
         var data = {
@@ -9,10 +11,12 @@ $(document).ready(function () {
             'text': text,
             'flag': 'sexp'
         }
-        $.post(window.location.protocol + "//" + window.location.host + "/", data,
-               function (res) {
-                   console.log(res);
-               });
+        $.post(window.location.protocol + "//" + window.location.host + "/", data, function (res) {
+            console.log(res);
+        });
+        submit.remove();
+        txtarea.remove();
+        $(this).remove();
     });
 
     $("#new").click(function () {
