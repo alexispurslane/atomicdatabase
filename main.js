@@ -35,14 +35,14 @@ let entities = {};
 
 let queries = [
     // Unification rules
-    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
-    '#Copula (#Noun|#Gerund) (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
-    '#Copula (#Noun|#Gerund) #Preposition (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
-    '(#Noun|#Gerund) (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
+    '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) #Copula (#Value|(#Noun|#Gerund|#Adjective))',
+    '#Copula (#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
+    '#Copula (#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
+    '(#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective) #Copula (#Value|(#Noun|#Gerund|#Adjective))',
 
     // Question rules
-    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund)',
-    '(#Noun|#Gerund) (#Noun|#Gerund)',
+    '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective)',
+    '(#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective)',
 ];
 
 const varize = (title, term) => {
