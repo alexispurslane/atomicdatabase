@@ -38,6 +38,7 @@ $(document).ready(function () {
 		// }
 		var colint = $(this).parent().index();
 		if (colint == 0) return;
+		var rowint = $(this).parent().parent().index();
 		var rowVal = $(this).parent().parent().children().first().children().first().val();
 		// console.log(rowVal);
 		var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
@@ -46,8 +47,8 @@ $(document).ready(function () {
 			'type': 'table',
 			'text': $(this).val(),
 			'tableUpdate': {
-				'row': rowVal,
-				'col': colVal,
+				'row': {"index": rowint, "value": rowVal},
+				'col': {"index": colint, "value": colVal},
 				'value': $(this).val()
 			}
 		};
@@ -99,7 +100,8 @@ $(document).ready(function () {
 					'type': 'delete-row',
 					'text': $(this).children().first().val(),
 					'tableUpdate': {
-						'row': rowVal,
+						'row': {"index": row, "value": row},
+						'col': {"index": colint, "value": colVal},
 						'value': $(this).children().first().val()
 					}
 				};
@@ -133,6 +135,7 @@ $(document).ready(function () {
 					return;
 				}
 				var delCol = $(this).children()[col];
+				var rowint = $(this).parent().index();
 				var rowVal = $(delCol).parent().children().first().children().first().val();
 				// console.log(rowVal);
 				var colVal = $($("#a").children()[col]).children().first().val();
@@ -142,7 +145,8 @@ $(document).ready(function () {
 					'type': 'delete-col',
 					'text': $(delCol).children().first().val(),
 					'tableUpdate': {
-						'col': colVal,
+						'row': {"index": rowint, "value": rowVal},
+						'col': {"index": col, "value": col},
 						'value': $(delCol).children().first().val()
 					}
 				};
@@ -160,10 +164,12 @@ $(document).ready(function () {
 		var data = {
 			'type': 'query',
 			'text': $(".query").first().val()
-		}
-		var answer = $.post(document.baseURI, data, function(data) {
+		};
+		$.post(document.baseURI, data, function(data) {
 			console.log(data);
-		})
+			var response = data.data[0];
+			$status.text("The answer is: " + Object.values(response)[0].toString());
+		});
 
 	});
 });

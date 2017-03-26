@@ -59,3 +59,6 @@ person1.age  = 12;
 person2.name = "Tom";
 person2.age  = 22;
 ```
+{data: []}
+{data: [{}]}
+{data: [{"aprop": ...} ... ]}
