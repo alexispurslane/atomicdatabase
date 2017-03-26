@@ -130,15 +130,12 @@ $(document).ready(function () {
 			}
 			$("tr").each(function () {
 				if ($(this).prop("id") === "a") {
-					$(this).children()[col].remove();
 					return;
 				}
 				var delCol = $(this).children()[col];
-				var colint = $(delCol).index();
 				var rowVal = $(delCol).parent().children().first().children().first().val();
 				// console.log(rowVal);
-				console.log($("#a").children().slice(colint-1, colint));
-				var colVal = $("#a").children().slice(colint-1, colint).children().first().val();
+				var colVal = $($("#a").children()[col]).children().first().val();
 				// console.log(colVal);
 				console.log([colVal, rowVal, $(delCol).children().first().val()]);
 				var data = {
@@ -154,6 +151,7 @@ $(document).ready(function () {
 				});
 				$(this).children()[col].remove();
 			});
+			$("#a").children()[col].remove();
 			$status.text("Column " + col + " deleted.");
 		}
 	});
@@ -163,8 +161,9 @@ $(document).ready(function () {
 			'type': 'query',
 			'text': $(".query").first().val()
 		}
-		$.post(document.baseURI, data, function(data) {
+		var answer = $.post(document.baseURI, data, function(data) {
 			console.log(data);
 		})
+
 	});
 });
