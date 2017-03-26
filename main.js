@@ -154,40 +154,36 @@ app.post('/', (req, res) => {
             db.push([a, e, v]);
         }
 
-        let ndb = db.filter((d) => Array.isArray(d));
-        console.log(ndb);
         res.send({
             success: true,
             updated: 'database',
-            data: ndb
+            data: db.filter((d) => Array.isArray(d))
         });
         break;
 
     case 'delete-row':
-        const [col, row] = [data.tableUpdate.col, data.tableUpdate.row];
+        const row = data.tableUpdate.row;
         db = db.filter((el) => {
             return el[1] !== row;
         });
-        let n2db = db.filter((d) => Array.isArray(d));
         console.log(n2db);
         res.send({
             success: true,
             updated: 'database',
-            data: n2db
+            data: db.filter((d) => Array.isArray(d))
         });
         break;
 
     case 'delete-col':
-        const [col1, row1] = [data.tableUpdate.col, data.tableUpdate.row];
+        const col = data.tableUpdate.col;
         db = db.filter((el) => {
             return el[0] !== col;
         });
-        let n3db = db.filter((d) => Array.isArray(d));
         console.log(n3db);
         res.send({
             success: true,
             updated: 'database',
-            data: n3db
+            data: db.filter((d) => Array.isArray(d))
         });
         break;
 
