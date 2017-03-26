@@ -80,7 +80,7 @@ $(document).ready(function () {
 			return;
 		}
 		if (confirm("Are you sure you want to delete a row?")) {
-			var row = prompt("Delete which row?");
+			var row = +prompt("Delete which row?");
 			if (row < 1) {
 				$status.text("ERROR: Cannot delete Row 1.");
 				return;
@@ -108,7 +108,7 @@ $(document).ready(function () {
 				});
 			});
 			$(delRow).remove();
-			$status.text("Row " + (row+1) + " deleted.");
+			$status.text("Row " + row + " deleted.");
 		}
 	});
 
@@ -123,15 +123,48 @@ $(document).ready(function () {
 			return;
 		}
 		if (confirm("Are you sure you want to delete a column?")) {
-			var col = prompt("Delete which column?");
+			var col = +prompt("Delete which column?");
 			if (col < 1) {
 				$status.text("ERROR: Cannot delete Column 1.");
 				return;
 			}
 			$("tr").each(function () {
+				if ($(this).prop("id") === "a") {
+					$(this).children()[col].remove();
+					return;
+				}
+				var delCol = $(this).children()[col];
+				var colint = $(delCol).index();
+				var rowVal = $(delCol).parent().children().first().children().first().val();
+				// console.log(rowVal);
+				console.log($("#a").children().slice(colint-1, colint));
+				var colVal = $("#a").children().slice(colint-1, colint).children().first().val();
+				// console.log(colVal);
+				console.log([colVal, rowVal, $(delCol).children().first().val()]);
+				var data = {
+					'type': 'delete-col',
+					'text': $(delCol).children().first().val(),
+					'tableUpdate': {
+						'col': colVal,
+						'value': $(delCol).children().first().val()
+					}
+				};
+				$.post(document.baseURI, data, function(data) {
+					console.log(data);
+				});
 				$(this).children()[col].remove();
 			});
-			$status.text("Row " + (col+1) + " deleted.");
+			$status.text("Column " + col + " deleted.");
 		}
+	});
+
+	$("#solve").click(function () {
+		var data = {
+			'type': 'query',
+			'text': $(this).val()
+		}
+		$.post(document.baseURI, data, function(data) {
+			console.log(data);
+		})
 	});
 });
