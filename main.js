@@ -166,7 +166,6 @@ app.post('/', (req, res) => {
         db = db.filter((el) => {
             return el[1] !== row;
         });
-        console.log(n2db);
         res.send({
             success: true,
             updated: 'database',
@@ -179,7 +178,6 @@ app.post('/', (req, res) => {
         db = db.filter((el) => {
             return el[0] !== col;
         });
-        console.log(n3db);
         res.send({
             success: true,
             updated: 'database',
