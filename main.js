@@ -11,8 +11,6 @@
   { 'index': ..., 'value': ... }
 */
 
-// Final entry sometimes does not work
-
 const known = require('@shieldsbetter/known');
 const k = known.factory;
 
@@ -46,22 +44,26 @@ let queries = [
     '#Noun #Noun',
 ];
 
+const varize = (term) => {
+    return term.map((exp) => {
+        if (exp[0].toUpperCase() === exp[0]) {
+            return k.placeholder(exp);
+        } else {
+            return exp;
+        }
+    });
+};
+
 const addRule = (buf, flag) => {
     if (flag == 'sexp' || flag === undefined) {
         console.log(buf);
         const terms = buf.split("\n").map((buf) => sexp(buf));
         console.log(terms);
         let expers = terms.map((term) => {
-            const newterm = term.map((exp) => {
-                if (exp[0].toUpperCase() === exp[0]) {
-                    return k.placeholder(exp);
-                } else {
-                    return exp;
-                }
-            });
+            const newterm = varize(term);
 
             if (term[0] == 'and' || term[0] == 'or') {
-                const rest = newterm.slice(1);
+                const rest = newterm.slice(1).map(varize);
                 return k[term[0]](...rest);
             } else {
                 return newterm;
@@ -296,7 +298,7 @@ app.post('/', (req, res) => {
         const successful = addRule(data.text, data.flag);
         res.send({
             success: successful,
-            updated: 'database',
+            updated: 'rules',
             data: null
         });
         break;

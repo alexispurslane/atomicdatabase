@@ -1,15 +1,15 @@
-const nlp = require("compromise");
-const process = require("process");
+const known = require("@shieldsbetter/known");
+const kfac = known.factory;
 
-console.log(nlp(process.argv[2]).match(process.argv[3]).found);
-/*
-  (father Person Parent)
-  (father Parent Grandparent)
-  (grandfather Person Grandparent)
-*/
+var db = [
+    ['father', 'tom', 'barry'],
+    ['father', 'barry', 'joe'],
+    kfac.implies(
+        kfac.and(['father', kfac.placeholder('x'), kfac.placeholder('y')],
+                 ['father', kfac.placeholder('y'), kfac.placeholder('z')]),
+        ['grandfather', kfac.placeholder('x'), kfac.placeholder('z')]
+    )
+];
 
-/*
-  the father of Person is Parent,
-  the father of Parent is Grandparent,
-  the grandfather of Person was Grandparent
-*/
+console.log(known.findValuations(['grandfather', 'tom', kfac.placeholder('person')],
+                                 known.dbize(db)));
