@@ -138,25 +138,27 @@ const addRule = (title, buf, flag) => {
 
 const satisfyQuery = (terms, matchingRule) => {
     let request;
+    var dat = terms.data().filter(d => d.normal !== '');
     if (matchingRule == 4) {
-        const [attribute, _, entity] = terms.data();
+        const [attribute, _, entity] = dat;
         request = [attribute.normal, entity.normal.replace('\'s', ''),
                    k.placeholder(uuidV4())];
     } else if (matchingRule == 5) {
-        const [entity, attribute] = terms.data();
+        const [entity, attribute] = dat;
+        console.log(terms)
         request = [attribute.normal, entity.normal.replace('\'s', ''),
                    k.placeholder(uuidV4())];
     } else if (matchingRule == 3) {
-        const [entity, attribute, _, value] = terms.data();
+        const [entity, attribute, _, value] = dat;
         request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
     } else if (matchingRule == 0) {
-        const [attribute, prep, entity, _, value] = terms.data();
+        const [attribute, prep, entity, _, value] = dat;
         request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
     } else if (matchingRule == 1) {
-        const [cop, attribute, entity, value] = terms.data();
+        const [cop, attribute, entity, value] = dat;
         request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
     } else if (matchingRule == 2) {
-        const [cop, entity, prep, attribute, value] = terms.data();
+        const [cop, entity, prep, attribute, value] = dat;
         request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
     }
 
