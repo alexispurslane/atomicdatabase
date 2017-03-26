@@ -1,22 +1,20 @@
+function addRule(title, body) {
+    $(".rules").append('<div class="rule">\
+        <h1><input style="font-size: 36px;height:38px;" value="'+title+'" type="text" class="form-control"/></h1>\
+        <textarea cols=80 rows=15 style="font-family: monospace;" class="form-control">'+body+'</textarea>\
+        <button class="btn btn-success submit" type="button" style="width: 100%;"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span></button>\
+      </div>');
+}
+
 $(document).ready(function () {
     var baseURI = window.location.protocol + "//" + window.location.host + "/";
 
     $.post(baseURI, {'type': 'rules'}, function (res) {
         var keys = Object.keys(res.data);
         if (keys.length > 0) {
-            keys.forEach(key => {
-                $(".rules").append('<div class="rule">\
-        <h1><input style="font-size: 36px;height:38px;" value="'+key+'" type="text" class="form-control"/></h1>\
-        <textarea cols=80 rows=15 style="font-family: monospace;" class="form-control">'+res.data[key].text+'</textarea>\
-        <button class="btn btn-success submit" type="button">Update rule</button>\
-      </div>');
-            });
+            keys.forEach(key => addRule(key, res.data[key].text));
         } else {
-            $(".rules").append('<div class="rule">\
-        <h1><input style="font-size: 36px;height:38px;" type="text" class="form-control"/></h1>\
-        <textarea cols=80 rows=15 style="font-family: monospace;" class="form-control">Type your rule here!</textarea>\
-        <button class="btn btn-success submit" type="button">Update rule</button>\
-      </div>');
+            addRule("", "");
         }
     });
 
@@ -40,10 +38,6 @@ $(document).ready(function () {
     });
 
     $("#new").click(function () {
-        $(".rules").append('<div class="rule">\
-        <h1><input style="font-size: 36px;height:38px;" type="text" class="form-control"/></h1>\
-        <textarea cols=80 rows=15 style="font-family: monospace;" class="form-control">Type your rule here!</textarea>\
-        <button class="btn btn-success submit" type="button">Update rule</button>\
-      </div>');
+        addRule("", "");
     });
 });
