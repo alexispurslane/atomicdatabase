@@ -1,6 +1,10 @@
 function addRule(title, body) {
     $(".rules").append('<div class="rule list-group-item">\
         <h4 class="list-group-item-heading"><input style="font-size: inherit;" value="'+title+'" type="text" class="form-control"/></h1>\
+        <select>\
+            <option value="natural">Natural Language</option>\
+            <option value="sexp">S-Expressions (pro)</option>\
+        </select>\
         <textarea rows=15 style="resize: vertical;font-family: monospace;" class="form-control">'+body+'</textarea>\
         <button class="btn btn-success submit" type="button" style="width: 100%;"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span></button>\
       </div>');
@@ -19,22 +23,13 @@ $(document).ready(function () {
     });
 
     $(document.body).on('click', ".submit", function () {
-        var submit = $($($(this).parent().children()[0]).children()[0]);
-        var txtarea = $($(this).parent().children()[1]);
-        var tt = $($($(this).parent().children()[0]).children()[0]);;
-        var n = submit.index($(this));
-        var text = txtarea.val();
-        var title = tt.val();
-
         var data = {
             'type': 'rule',
-            'text': text,
-            'title': title,
-            'flag': 'sexp'
-        }
-        $.post(baseURI, data, function (res) {
-            console.log(res);
-        });
+            'text': $($(this).parent().children()[2]).val(),
+            'title': $($($(this).parent().children()[0]).children()[0]).val(),
+            'flag': $($(".submit").parent().children()[1]).val()
+        };
+        $.post(baseURI, data, function (res) { console.log(res); });
     });
 
     $("#new").click(function () {

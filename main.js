@@ -35,14 +35,14 @@ let entities = {};
 
 let queries = [
     // Unification rules
-    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
-    '#Copula (#Noun|#Gerund) (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
-    '#Copula (#Noun|#Gerund) #Preposition (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
-    '(#Noun|#Gerund) (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
-
+    '(#Noun|#Gerund|#Value|#Acronym) #Copula (#Noun|#Gerund|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym) #Copula (#Noun|#Gerund|#Value|#Acronym)',
     // Question rules
-    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund)',
-    '(#Noun|#Gerund) (#Noun|#Gerund)',
+    '(#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
 ];
 
 const varize = (title, term) => {
@@ -57,7 +57,7 @@ const varize = (title, term) => {
 
 const addRule = (title, buf, flag) => {
     if (flag == 'sexp' || flag === undefined) {
-        console.log(buf);
+        console.log("S-Expression");
         const terms = buf.split("\n").map((buf) => sexp(buf));
         console.log(terms);
         let expers = terms.map((term) => {
@@ -76,93 +76,63 @@ const addRule = (title, buf, flag) => {
         ));
         return expers;
     } else if (flag === 'natural') {
+        console.log("Natural language");
         let rules = [];
-        const lines = buf.split('\n');
-        const matchers = queries.slice(2);
+        const lines = buf.split(/\n/);
         lines.forEach((line) => {
-            matchers.find((ms, matchingRule) => {
+            console.log(line);
+            queries.find((ms, matchingRule) => {
                 const match = nlp(line).match(ms);
                 if (match.found) {
-                    if (matchingRule == 4) {
-                        const [attribute, _, entity] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 5) {
-                        const [entity, attribute] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 3) {
-                        const [entity, attribute, _, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 0) {
-                        const [attribute, prep, entity, _, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 1) {
-                        const [cop, attribute, entity, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 2) {
-                        const [cop, entity, prep, attribute, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    }
-                    return rules;
+                    console.log("Statement matched: " + ms);
+                    let p = parseToAEV(match.terms(), matchingRule);
+                    rules.push(p);
+                    return true;
                 }
                 return false;
             });
         });
 
         db.push(k.implies(...rules));
+        return rules;
     }
+    return false;
+};
+
+const parseToAEV = (terms, matchingRule) => {
+    let attribute, entity, value;
+    let dat = terms.data().filter(d => d.normal !== '');
+
+    if (matchingRule == 0) {
+        [value, attribute, entity] = dat;
+    } else if (matchingRule == 1) {
+        [attribute,, entity,, value] = dat;
+    } else if (matchingRule == 2) {
+        [, attribute, entity, value] = dat;
+    } else if (matchingRule == 3) {
+        [, entity,, attribute, value] = dat;
+    } else if (matchingRule == 4) {
+        [entity, attribute,, value] = dat;
+    } else if (matchingRule == 5) {
+        [attribute,, entity] = dat;
+    } else if (matchingRule == 6) {
+        [entity, attribute] = dat;
+    }
+
+    return [attribute, entity, value].map((v) => {
+        if (v === undefined) {
+            return k.placeholder("QuestionVariable-"+uuidV4());
+        } else if (v.bestTag === 'TitleCase' || v.bestTag === 'Acronym'
+                   || v.text[0] == v.text[0].toUpperCase()) {
+            return k.placeholder(v.normal.replace(/'[a-z]/g, ""));
+        } else {
+            return v.normal.replace(/'[a-z]/g, "");
+        }
+    });
 };
 
 const satisfyQuery = (terms, matchingRule) => {
-    let request;
-    var dat = terms.data().filter(d => d.normal !== '');
-    if (matchingRule == 4) {
-        const [attribute, _, entity] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''),
-                   k.placeholder(uuidV4())];
-    } else if (matchingRule == 5) {
-        const [entity, attribute] = dat;
-        console.log(terms)
-        request = [attribute.normal, entity.normal.replace('\'s', ''),
-                   k.placeholder(uuidV4())];
-    } else if (matchingRule == 3) {
-        const [entity, attribute, _, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 0) {
-        const [attribute, prep, entity, _, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 1) {
-        const [cop, attribute, entity, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 2) {
-        const [cop, entity, prep, attribute, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    }
-
-    console.log(request);
+    let request = parseToAEV(terms, matchingRule);
     return known.findValuations(request, known.dbize(db));
 };
 
