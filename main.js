@@ -12,7 +12,7 @@
 */
 
 const known = require('@shieldsbetter/known');
-const k = known.kfac;
+const k = known.factory;
 
 const sexp = require('s-expression');
 
@@ -47,7 +47,7 @@ const addRule = (buf, flag) => {
         let expers = terms.map((term) => {
             const newterm = term.map((exp) => {
                 if (exp[0].toUpperCase() === exp[0]) {
-                    return k.placeholdeR(exp);
+                    return k.placeholder(exp);
                 } else {
                     return exp;
                 }
@@ -73,7 +73,7 @@ const addRule = (buf, flag) => {
                 const match = nlp(line).match(ms);
                 if (match.found) {
                     if (matchingRule == 2) {
-                        const [entity, attribute, _, value] = terms.data()[0];
+                        const [entity, attribute, _, value] = terms.data();
 
                         let v = value.normal;
                         if (value.bestTag === 'TitleCase') {
@@ -81,7 +81,7 @@ const addRule = (buf, flag) => {
                         }
                         rules.push([attribute.normal, entity.normal, v]);
                     } else if (matchingRule == 3) {
-                        const [attribute, prep, entity, _, value] = terms.data()[0];
+                        const [attribute, prep, entity, _, value] = terms.data();
 
                         let v = value.normal;
                         if (value.bestTag === 'TitleCase') {
@@ -102,30 +102,30 @@ const addRule = (buf, flag) => {
 const satisfyQuery = (terms, matchingRule) => {
     let request;
     if (matchingRule == 0) {
-        const [attribute, _, entity] = terms.data()[0];
+        const [attribute, _, entity] = terms.data();
         console.log([attribute.normal, entity.normal]);
 
         request = [attribute.normal, entity.normal, k.placeholder(uuidV4())];
     } else if (matchingRule == 1) {
-        const [entity, attribute] = terms.data()[0];
+        const [entity, attribute] = terms.data();
         console.log([attribute.normal, entity.normal]);
 
         request = [attribute.normal, entity.normal.replace('\'s', ''),
                    k.placeholder(uuidV4())];
     } else if (matchingRule == 2) {
-        const [entity, attribute, _, value] = terms.data()[0];
+        const [entity, attribute, _, value] = terms.data();
         console.log([attribute.normal, entity.normal, value.normal]);
 
         request = [attribute.normal, entity.normal, value.normal];
     } else if (matchingRule == 3) {
-        const [attribute, prep, entity, _, value] = terms.data()[0];
+        const [attribute, prep, entity, _, value] = terms.data();
         console.log([attribute.normal, entity.normal, value.normal]);
 
         request = [attribute.normal, entity.normal, value.normal];
     }
 
     console.log(request);
-    return k.findValiuations(...request, known.dbsize(db));
+    return known.findValuations(request, known.dbize(db));
 };
 
 // Handle requests
@@ -238,7 +238,7 @@ app.post('/', (req, res) => {
         break;
 
     case 'query':
-        const foundQuery = null;
+        let foundQuery = null;
         console.log(data.text);
 
         queries.find((ms, i) => {
