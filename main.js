@@ -46,7 +46,9 @@ let queries = [
 
 const addRule = (buf, flag) => {
     if (flag == 'sexp' || flag === undefined) {
-        const terms = sexp(buf);
+        console.log(buf);
+        const terms = buf.split("\n").map((buf) => sexp(buf));
+        console.log(terms);
         let expers = terms.map((term) => {
             const newterm = term.map((exp) => {
                 if (exp[0].toUpperCase() === exp[0]) {
