@@ -270,7 +270,7 @@ $(document).ready(function () {
                 if (data.data.length > 0) {
                     var str = data.data.map(
                         (r) =>
-                            Object.values(response)[0].toString()).join(", ");
+                            Object.values(r)[0].toString()).join(", ");
                     $status.text("The answers are: ");
                 } else {
                     $status.text("I don't know enough to answer this question. Either I need more data or one of your rules was incorrect.");
