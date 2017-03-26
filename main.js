@@ -35,14 +35,14 @@ let entities = {};
 
 let queries = [
     // Unification rules
-    '#Noun #Preposition #Noun #Copula (#Value|#Noun)',
-    '#Copula #Noun #Noun (#Value|#Noun)',
-    '#Copula #Noun #Preposition #Noun (#Value|#Noun)',
-    '#Noun #Noun #Copula (#Value|#Noun)',
+    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
+    '#Copula (#Noun|#Gerund) (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
+    '#Copula (#Noun|#Gerund) #Preposition (#Noun|#Gerund) (#Value|(#Noun|#Gerund))',
+    '(#Noun|#Gerund) (#Noun|#Gerund) #Copula (#Value|(#Noun|#Gerund))',
 
     // Question rules
-    '#Noun #Preposition #Noun',
-    '#Noun #Noun',
+    '(#Noun|#Gerund) #Preposition (#Noun|#Gerund)',
+    '(#Noun|#Gerund) (#Noun|#Gerund)',
 ];
 
 const varize = (title, term) => {
