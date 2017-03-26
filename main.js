@@ -3,7 +3,7 @@
   Requests should be of the format:
 
   {
-  'type': 'table' | 'query' | 'rule' | 'delete',
+  'type': 'table' | 'query' | 'rule' | 'delete-row' | 'delete-col',
   'text': ...,
   'tableUpdate': { 'row': ..., 'col': ..., 'value': ...}
   }
@@ -163,10 +163,10 @@ app.post('/', (req, res) => {
         });
         break;
 
-    case 'delete':
-        const [att, ent] = [data.tableUpdate.col, data.tableUpdate.row];
+    case 'delete-row':
+        const [col, row] = [data.tableUpdate.col, data.tableUpdate.row];
         db = db.filter((el) => {
-            return el[0] !== att && el[1] !== ent;
+            return el[1] !== row;
         });
         let n2db = db.filter((d) => Array.isArray(d));
         console.log(n2db);
@@ -174,6 +174,20 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: n2db
+        });
+        break;
+
+    case 'delete-col':
+        const [col1, row1] = [data.tableUpdate.col, data.tableUpdate.row];
+        db = db.filter((el) => {
+            return el[0] !== col;
+        });
+        let n3db = db.filter((d) => Array.isArray(d));
+        console.log(n3db);
+        res.send({
+            success: true,
+            updated: 'database',
+            data: n3db
         });
         break;
 
