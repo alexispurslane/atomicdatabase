@@ -1,3 +1,4 @@
 const nlp = require("compromise");
+const process = require("process");
 
-console.log(nlp("tom's sibling").terms().data());
+console.log(nlp(process.argv[2]).terms().data());

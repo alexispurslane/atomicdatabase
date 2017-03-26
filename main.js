@@ -235,6 +235,7 @@ app.post('/', (req, res) => {
             });
             return;
         }
+        delete entities[data.tableUpdate.row];
         db = db.filter((el) => {
             return el[1] !== row;
         });
@@ -259,6 +260,7 @@ app.post('/', (req, res) => {
             });
             return;
         }
+        delete attrs[data.tableUpdate.col];
         db = db.filter((el) => {
             return el[0] !== col;
         });
