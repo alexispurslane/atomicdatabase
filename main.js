@@ -7,6 +7,8 @@
   'text': ...,
   'tableUpdate': { 'row': ..., 'col': ..., 'value': ...}
   }
+
+  { 'index': ..., 'value': ... }
 */
 
 const known = require('@shieldsbetter/known');
@@ -145,13 +147,15 @@ app.post('/', (req, res) => {
         });
         break;
     case 'table':
-        const [a, e, v] = [data.tableUpdate.col.value,
-                           data.tableUpdate.row.value,
+        const [a, e, v] = [data.tableUpdate.col.value || data.tableUpdate.col,
+                           data.tableUpdate.row.value || data.tableUpdate.row,
                            data.tableUpdate.value];
 
         // Keep track
-        attrs[a] = data.tableUpdate.col.index;
-        entities[e] = data.tableUpdate.row.index;
+        if (data.tableUpdate.col.index) {
+            attrs[a] = data.tableUpdate.col.index;
+            entities[e] = data.tableUpdate.row.index;
+        }
 
         if (typeof a !== 'string' || typeof e !== 'string' || typeof v !== 'string' ||
             a === '' || e === '' || v === '') {
