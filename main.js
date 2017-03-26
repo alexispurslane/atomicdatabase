@@ -161,7 +161,8 @@ app.post('/', (req, res) => {
             a === '' || e === '' || v === '') {
             res.send({
                 success: false,
-                updated: 'database'
+                updated: 'database',
+                data: 'Expecting valid Attributes, Entities, and Values'
             });
             return;
         }
@@ -189,6 +190,14 @@ app.post('/', (req, res) => {
 
     case 'delete-row':
         const row = data.tableUpdate.row;
+        if (typeof row !== "string") {
+            res.send({
+                success: false,
+                updated: 'database',
+                data: 'Expecting a valid row.'
+            });
+            return;
+        }
         db = db.filter((el) => {
             return el[1] !== row;
         });
@@ -205,6 +214,14 @@ app.post('/', (req, res) => {
 
     case 'delete-col':
         const col = data.tableUpdate.col;
+        if (typeof col !== "string") {
+            res.send({
+                success: false,
+                updated: 'database',
+                data: 'Expecting a valid column.'
+            });
+            return;
+        }
         db = db.filter((el) => {
             return el[0] !== col;
         });
