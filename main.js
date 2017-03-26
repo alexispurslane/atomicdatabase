@@ -45,7 +45,7 @@ let queries = [
     '#Noun #Noun',
 ];
 
-const varize = (term, title) => {
+const varize = (title, term) => {
     return term.map((exp) => {
         if (exp[0].toUpperCase() === exp[0]) {
             return k.placeholder(title+'-'+exp);
