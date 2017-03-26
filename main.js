@@ -30,6 +30,7 @@ const app = express();
 // For display purposes, remember that facts are held as AEV
 let db = [];
 let attrs = {};
+let rules = {};
 let entities = {};
 
 let queries = [
@@ -44,26 +45,26 @@ let queries = [
     '#Noun #Noun',
 ];
 
-const varize = (term) => {
+const varize = (term, title) => {
     return term.map((exp) => {
         if (exp[0].toUpperCase() === exp[0]) {
-            return k.placeholder(exp);
+            return k.placeholder(title+'-'+exp);
         } else {
             return exp;
         }
     });
 };
 
-const addRule = (buf, flag) => {
+const addRule = (title, buf, flag) => {
     if (flag == 'sexp' || flag === undefined) {
         console.log(buf);
         const terms = buf.split("\n").map((buf) => sexp(buf));
         console.log(terms);
         let expers = terms.map((term) => {
-            const newterm = varize(term);
+            const newterm = varize(title, term);
 
             if (term[0] == 'and' || term[0] == 'or') {
-                const rest = newterm.slice(1).map(varize);
+                const rest = newterm.slice(1).map((x) => varize(title, x));
                 return k[term[0]](...rest);
             } else {
                 return newterm;
@@ -295,11 +296,20 @@ app.post('/', (req, res) => {
         break;
 
     case 'rule':
-        const successful = addRule(data.text, data.flag);
+        const successful = addRule(data.title, data.text, data.flag);
+        rules[data.title] = data;
         res.send({
             success: successful,
             updated: 'rules',
             data: null
+        });
+        break;
+
+    case 'rules':
+        res.send({
+            success: true,
+            updated: null,
+            data: rules
         });
         break;
 
