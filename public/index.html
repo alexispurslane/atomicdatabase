@@ -30,6 +30,14 @@
             </table>
 
             <div class="table-control" style="padding: 5px; width:100%; position: fixed; bottom: 50px;">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr id="properties"></tr>
+                    </thead>
+                    <thead>
+                        <tr id="values"></tr>
+                    </thead>
+                </table>
                 <button class="btn btn-primary" id="add-row">Add Row</button>
                 <button class="btn btn-danger"  id="del-row">Delete Row</button>
                 <button class="btn btn-primary" id="add-col">Add Column</button>
@@ -40,7 +48,7 @@
                         <button class="btn btn-success" id="solve" type="button"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></button>
                     </span>
                 </div>
-                <pre id="status" style="display: block; width: 100%; padding-right: 5px;">Ready.</pre>
+                <p id="status" style="display: block; width: 100%; padding-right: 5px;">Ready.</p>
             </div>
         </div>
     </body>

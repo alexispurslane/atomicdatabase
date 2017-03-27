@@ -35,14 +35,14 @@ let entities = {};
 
 let queries = [
     // Unification rules
-    '(#Noun|#Gerund|#Value|#Acronym) #Copula (#Noun|#Gerund|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Acronym)',
-    '#Copula (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
-    '#Copula (#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym) #Copula (#Noun|#Gerund|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Adjective|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
     // Question rules
-    '(#Noun|#Gerund|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Value|#Acronym) (#Noun|#Gerund|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
 ];
 
 const varize = (title, term) => {
@@ -55,6 +55,22 @@ const varize = (title, term) => {
     });
 };
 
+const splitByConj = (line) => {
+    const conj = nlp(line).terms().data().find(
+        x => x.tags.indexOf('Conjunction') !== -1);
+    if (conj !== undefined) {
+        console.log("Conjunction found!");
+        let loc = line.indexOf(conj.normal);
+        let size = conj.normal.length+1;
+
+        let car = line.substring(0, loc-1);
+        let cdr = line.substring(loc+size);
+        return k[conj.normal](parseFullyToAEV(car), splitByConj(cdr));
+    } else {
+        return parseFullyToAEV(line);
+    }
+};
+
 const addRule = (title, buf, flag) => {
     if (flag == 'sexp' || flag === undefined) {
         console.log("S-Expression");
@@ -64,7 +80,7 @@ const addRule = (title, buf, flag) => {
             const newterm = varize(title, term);
 
             if (term[0] == 'and' || term[0] == 'or') {
-                const rest = newterm.slice(1).map((x) => varize(title, x));
+                const rest = newterm.slice(1).map(x => varize(title, x));
                 return k[term[0]](...rest);
             } else {
                 return newterm;
@@ -78,20 +94,13 @@ const addRule = (title, buf, flag) => {
     } else if (flag === 'natural') {
         console.log("Natural language");
         let rules = [];
-        const lines = buf.split(/\n/);
+        const lines = nlp(buf).statements().data().map(x => x.text);
+        console.log(lines);
         lines.forEach((line) => {
-            console.log(line);
-            queries.find((ms, matchingRule) => {
-                const match = nlp(line).match(ms);
-                if (match.found) {
-                    console.log("Statement matched: " + ms);
-                    let p = parseToAEV(match.terms(), matchingRule);
-                    rules.push(p);
-                    return true;
-                }
-                return false;
-            });
+            rules.push(splitByConj(line));
         });
+
+        console.log(rules);
 
         db.push(k.implies(...rules));
         return rules;
@@ -99,31 +108,46 @@ const addRule = (title, buf, flag) => {
     return false;
 };
 
+const parseFullyToAEV = (line) => {
+    let found = false;
+    return queries.map((ms, matchingRule) => {
+        const match = nlp(line).match(ms);
+        if (match.found && !found) {
+            console.log("Sentence matched rule " +matchingRule+": " + ms);
+            found = true;
+            return parseToAEV(match.terms(), matchingRule);
+        }
+        return undefined;
+    }).filter(x => x !== undefined)[0];
+};
+
 const parseToAEV = (terms, matchingRule) => {
     let attribute, entity, value;
     let dat = terms.data().filter(d => d.normal !== '');
 
-    if (matchingRule == 0) {
+    if (matchingRule === 0) {
         [value, attribute, entity] = dat;
-    } else if (matchingRule == 1) {
+    } else if (matchingRule === 1) {
         [attribute,, entity,, value] = dat;
-    } else if (matchingRule == 2) {
+    } else if (matchingRule === 2) {
         [, attribute, entity, value] = dat;
-    } else if (matchingRule == 3) {
+    } else if (matchingRule === 3) {
         [, entity,, attribute, value] = dat;
-    } else if (matchingRule == 4) {
+    } else if (matchingRule === 4) {
         [entity, attribute,, value] = dat;
-    } else if (matchingRule == 5) {
+    } else if (matchingRule === 5) {
         [attribute,, entity] = dat;
-    } else if (matchingRule == 6) {
+    } else if (matchingRule === 6) {
         [entity, attribute] = dat;
     }
 
-    return [attribute, entity, value].map((v) => {
+    return [attribute, entity, value].map(v => {
         if (v === undefined) {
-            return k.placeholder("QuestionVariable-"+uuidV4());
-        } else if (v.bestTag === 'TitleCase' || v.bestTag === 'Acronym'
-                   || v.text[0] == v.text[0].toUpperCase()) {
+            return k.placeholder(entity.normal+"-"+attribute.normal);
+        }
+
+        let vt = v.text.replace(/'[a-z]/g, "");
+        if (vt == vt.toUpperCase() && isNaN(v.text)) {
             return k.placeholder(v.normal.replace(/'[a-z]/g, ""));
         } else {
             return v.normal.replace(/'[a-z]/g, "");
@@ -131,9 +155,8 @@ const parseToAEV = (terms, matchingRule) => {
     });
 };
 
-const satisfyQuery = (terms, matchingRule) => {
-    let request = parseToAEV(terms, matchingRule);
-    return known.findValuations(request, known.dbize(db));
+const satisfyQuery = (line) => {
+    return known.findValuations(splitByConj(line), known.dbize(db));
 };
 
 // Handle requests
@@ -149,7 +172,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: null,
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -190,7 +213,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -215,7 +238,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -240,7 +263,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -248,20 +271,7 @@ app.post('/', (req, res) => {
         break;
 
     case 'query':
-        let foundQuery = null;
-        console.log(data.text);
-
-        queries.find((ms, i) => {
-            console.log("Testing format " + i + ": " + ms);
-            let match = nlp(data.text).match(ms);
-            if (match.found) {
-                console.log("Sentence matched!");
-                foundQuery = satisfyQuery(match.terms(), i);
-                console.log("Result is: " + foundQuery);
-                return true;
-            }
-            return false;
-        });
+        let foundQuery = satisfyQuery(data.text);
 
         res.send({
             success: !!foundQuery,

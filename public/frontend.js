@@ -18,7 +18,7 @@ $(document).ready(function () {
         s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
     }
     s += "</tr> </thead>";
-    $("table").prepend(s);
+    $("table").first().prepend(s);
     $("input").first().prop("disabled", true);
     $("input").first().prop("readonly", false);
 
@@ -255,7 +255,7 @@ $(document).ready(function () {
             $("#a").children()[col].remove();
             $status.text("Column " + col + " deleted.");
         }
-    }
+    };
 
     $("#del-col").click(delCol);
 
@@ -272,11 +272,18 @@ $(document).ready(function () {
                         (r) =>
                             Object.values(r)[0].toString()).join(", ");
                     $status.text("The answers are: "+str);
+
+                    $("#properties").html("");
+                    $("#values").html("");
+                    Object.keys(data.data[0]).forEach((k) => {
+                        $("#properties").append("<td>" + k + "</td>");
+                        $("#values").append("<td>" + data.data[0][k] + "</td>");
+                    });
                 } else {
-                    $status.text("I don't know enough to answer this question. Either I need more data or one of your rules was incorrect.");
+                    $status.html("No data satisfied this query. Either I need more data or one of your rules was incorrect, or it was contradictory.");
                 }
             } else {
-                $status.text("I didn't understand that query.");
+                $status.html("I didn't understand that query.");
             }
         });
     });
