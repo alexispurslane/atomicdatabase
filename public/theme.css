@@ -8,9 +8,9 @@
 }
 
 input[disabled] {
-	background-color: white !important;
-	box-shadow: none !important;
-	border: none !important;
+    background-color: white !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 .container-fluid {
@@ -22,6 +22,4 @@ table > thead > tr > td > input {
 }
 
 #status {
-	position: fixed;
-	bottom: 0;
 }

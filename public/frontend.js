@@ -13,16 +13,16 @@ var BreakException = {};
 $(document).ready(function () {
     var $status = $("#status");
 
-    var s = "<thead> <tr id=\"a\"> "
+    var s = "<thead> <tr id=\"a\"> ";
     for (var i = 0; i < 5; i++) {
         s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
     }
     s += "</tr> </thead>";
     $("table").first().prepend(s);
-    $("input").first().prop("disabled", true);
-    $("input").first().prop("readonly", false);
+    $($("input").get(1)).prop("disabled", true);
+    $($("input").get(1)).prop("readonly", false);
 
-    s = "<tr> "
+    s = "<tr> ";
     for (var i = 0; i < 5; i++) {
         s += fieldSlot;
     }
@@ -33,11 +33,12 @@ $(document).ready(function () {
     // On each reload: Load data
     var reloadRequest = {
         'type': 'reload'
-    }
+    };
     $.post(baseURI, reloadRequest, function (data) {
         var actualData = data.data;
         var attrOrder = Object.entries(actualData.attrOrder);
         var entityOrder = Object.entries(actualData.entityOrder);
+
         var database = actualData.database;
         if (attrOrder.length === 0 || entityOrder.length === 0 || database.length === 0) return;
         var numColsToAdd = attrOrder.length - 4;
@@ -95,14 +96,13 @@ $(document).ready(function () {
                         var item = $(this);
                         var index = item.index();
                         // if (index === 0) return;
-                        console.log(index);
                         if (e[0] === $($("#a").children()[index]).children().first().val()) {
                             item.children().first().val(e[2]);
                             return;
                         }
                     });
                 }
-            })
+            });
         });
     });
 
@@ -259,6 +259,11 @@ $(document).ready(function () {
 
     $("#del-col").click(delCol);
 
+    $('.query').first().keydown(function(event){
+        if(event.keyCode==13){
+            $('#solve').trigger('click');
+        }
+    });
     $("#solve").click(function () {
         var data = {
             'type': 'query',
@@ -268,10 +273,9 @@ $(document).ready(function () {
             console.log(data);
             if (data.success) {
                 if (data.data.length > 0) {
-                    var str = data.data.map(
-                        (r) =>
-                            Object.values(r)[0].toString()).join(", ");
-                    $status.text("The answers are: "+str);
+                    var str = Object.values(data.data[0]).join(", ");
+                    $status.html(
+                        '<div class="alert alert-info" role="alert"><strong>Possible answers are</strong>: '+str+'</div>');
 
                     $("#properties").html("");
                     $("#values").html("");
@@ -280,10 +284,14 @@ $(document).ready(function () {
                         $("#values").append("<td>" + data.data[0][k] + "</td>");
                     });
                 } else {
-                    $status.html("No data satisfied this query. Either I need more data or one of your rules was incorrect, or it was contradictory.");
+                    $status.html(
+                        '<div class="alert alert-warning" role="alert">\
+<strong>No data satisfied this query.</strong>\
+ Either I need more data or one of your rules was incorrect, or it was contradictory.</div>');
                 }
             } else {
-                $status.html("I didn't understand that query.");
+                $status.html(
+                    '<div class="alert alert-danger" role="alert"><strong>I didn\'t understand that.</strong></div>');
             }
         });
     });
