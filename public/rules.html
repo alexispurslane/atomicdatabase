@@ -5,6 +5,7 @@
     <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
     <link rel="stylesheet" type="text/css" href="theme.css">
     <script src="./js/jquery-3.2.0.min.js"></script>
+    <script src="https://unpkg.com/compromise/builds/compromise.min.js"></script>
     <script src="rules.js"></script>
   </head>
 
@@ -26,12 +27,15 @@
       </ul>
     </nav>
 
-    <div class="container-fluid" style="margin-right: 60px; margin-left: 60px;">
+    <div class="container-fluid" style="margin-right: 20%; margin-left: 20%;">
       <div class="rules list-group">
       </div>
 
-      <button class="btn btn-lg btn-warning" id="new" type="button" style="position: fixed; bottom: 0; right: 0;margin-right: 22px; margin-bottom: 20px; ">
-        <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
-      </button>
+      <div id="control" style="position: fixed; bottom: 0; right: 0;margin-right: 22px; margin-bottom: 20px; ">
+        <div id="status"><div class="alert alert-success">Ready.</div></div>
+        <button class="btn btn-lg btn-warning pull-right" id="new" type="button">
+          <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+        </button>
+      </div>
   </body>
 </html>

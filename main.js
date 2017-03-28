@@ -14,7 +14,7 @@
 const known = require('@shieldsbetter/known');
 const k = known.factory;
 
-const sexp = require('s-expression');
+const parseSexp = require('s-expression');
 
 const nlp = require('compromise');
 
@@ -45,14 +45,12 @@ let queries = [
     '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
 ];
 
-const varize = (title, term) => {
-    return term.map((exp) => {
-        if (exp[0].toUpperCase() === exp[0]) {
-            return k.placeholder(title+'-'+exp);
-        } else {
-            return exp;
-        }
-    });
+const isUnderstood = (exp) => {
+    if (Array.isArray(exp)) {
+        return exp.every(isUnderstood);
+    } else {
+        return !!exp;
+    }
 };
 
 const splitByConj = (line) => {
@@ -71,26 +69,47 @@ const splitByConj = (line) => {
     }
 };
 
-const addRule = (title, buf, flag) => {
-    if (flag == 'sexp' || flag === undefined) {
-        console.log("S-Expression");
-        const terms = buf.split("\n").map((buf) => sexp(buf));
-        console.log(terms);
-        let expers = terms.map((term) => {
-            const newterm = varize(title, term);
+const parseExpers = (title, sexp) => {
+    console.log(sexp);
+    if (Array.isArray(sexp)) {
+        if (sexp[0] === "and" || sexp[0] === "or") {
+            return k[sexp[0]](...sexp.slice(1).map((x) => parseExpers(title, x)));
+        } else {
+            return sexp.map((x) => parseExpers(title, x));
+        }
+    } else {
+        if (sexp === sexp.toUpperCase() && isNaN(sexp)) {
+            return k.placeholder(title+"-"+sexp.toLowerCase());
+        } else if (sexp === undefined) {
+            return k.placeholder(title+"-"+uuidV4());
+        } else {
+            return sexp;
+        }
+    }
+};
 
-            if (term[0] == 'and' || term[0] == 'or') {
-                const rest = newterm.slice(1).map(x => varize(title, x));
-                return k[term[0]](...rest);
-            } else {
-                return newterm;
-            }
-        });
-        console.log(expers);
-        db.push(k.implies(
-            ...expers
-        ));
-        return expers;
+let allCompleteSexps = (buffer) => {
+    let parens = 0;
+    let sexps = [];
+    let sexp = '';
+    buffer.split('').forEach((char) => {
+        if (char === '(') parens++;
+        if (char === ')') parens--;
+        if (parens > 0 || char.replace(/\s+/, "") !== "") sexp += char;
+        if (parens === 0 && sexp !== "") { sexps.push(sexp); sexp = ""; }
+    });
+
+    return sexps.map(parseSexp);
+};
+
+const prepare = x => x.replace(/#.*$/gi, '').replace(/[{\[<]/gi, '(').replace(/[}\]>]/gi, ')');
+
+const addRule = (title, buf, flag) => {
+    if (flag === 'sexp' || flag === undefined) {
+        console.log("S-Expression");
+        const exprs = parseExpers(title, allCompleteSexps(prepare(buf)));
+        db.push(k.implies(...exprs));
+        return o;
     } else if (flag === 'natural') {
         console.log("Natural language");
         let rules = [];
@@ -147,7 +166,7 @@ const parseToAEV = (terms, matchingRule) => {
         }
 
         let vt = v.text.replace(/'[a-z]/g, "");
-        if (vt == vt.toUpperCase() && isNaN(v.text)) {
+        if (vt === vt.toUpperCase() && isNaN(v.text)) {
             return k.placeholder(v.normal.replace(/'[a-z]/g, ""));
         } else {
             return v.normal.replace(/'[a-z]/g, "");
@@ -200,7 +219,7 @@ app.post('/', (req, res) => {
         }
         let alreadyPresent = false;
         db.forEach((el, i, db) => {
-            if (a == el[0] && e == el[1]) {
+            if (a === el[0] && e === el[1]) {
                 db[i] = [a, e, v];
                 alreadyPresent = true;
             }
@@ -281,13 +300,32 @@ app.post('/', (req, res) => {
         break;
 
     case 'rule':
-        const successful = addRule(data.title, data.text, data.flag);
-        rules[data.title] = data;
+        const results = addRule(data.title, data.text, data.flag);
+        const successful = isUnderstood(results);
+
+        if (successful) {
+            data.tree = results;
+            data.index = db.length - 1;
+            rules[data.title] = data;
+        }
 
         res.send({
-            success: !!successful,
+            success: successful,
             updated: 'rules',
-            data: successful
+            data: results
+        });
+        break;
+
+    case 'delete-rule':
+        let indb = data.title in rules;
+        if (indb) {
+            console.log("deleting " + data.title);
+            delete db[rules[data.title].index];
+            delete rules[data.title];
+        }
+        res.send({
+            success: indb,
+            updated:'rules'
         });
         break;
 

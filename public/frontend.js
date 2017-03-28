@@ -19,8 +19,8 @@ $(document).ready(function () {
     }
     s += "</tr> </thead>";
     $("table").first().prepend(s);
-    $($("input").get(1)).prop("disabled", true);
-    $($("input").get(1)).prop("readonly", false);
+    $("input").first().prop("disabled", true);
+    $("input").first().prop("readonly", false);
 
     s = "<tr> ";
     for (var i = 0; i < 5; i++) {

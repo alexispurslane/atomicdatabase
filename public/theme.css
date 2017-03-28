@@ -23,3 +23,19 @@ table > thead > tr > td > input {
 
 #status {
 }
+
+.code {
+    font-family: Menlo, Consolas, monospace;
+    background: #2d2d2d;
+    color: white;
+    resize: vertical;
+}
+
+.toolbar {
+    width: 50%;
+    display: inline-block;
+}
+
+.delete {
+    float: right;
+}
