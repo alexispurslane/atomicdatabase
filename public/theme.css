@@ -14,14 +14,22 @@ input[disabled] {
 }
 
 .container-fluid {
-    padding-top: 65px !important;
+    padding-top: 115px !important;
 }
 
 table > thead > tr > td > input {
     font-weight: bold !important;
 }
 
-#status {
+#status > .alert {
+    border-top-left-radius: 0px !important;
+    border-top-right-radius: 0px !important;
+    border-bottom-left-radius: 3px !important;
+    border-bottom-right-radius: 3px !important;
+}
+
+* {
+    border-radius: 2px !important;
 }
 
 .code {
@@ -38,4 +46,99 @@ table > thead > tr > td > input {
 
 .delete {
     float: right;
+}
+
+.btn {
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1;
+    text-transform: uppercase;
+    border: 3px solid transparent;
+    border-radius: 2px;
+}
+
+.navbar-inverse {
+    background-color: #BADA55;
+}
+
+.navbar-inverse .navbar-brand {
+    color: black;
+    text-transform: lowercase;
+}
+
+.navbar-inverse .navbar-nav>li>a {
+    color: black;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.alert-warning {
+    background-color: #da5578;
+    color: white;
+}
+
+.alert-danger {
+    background-color: #b655da;
+    color: white;
+}
+
+.alert-success {
+    background-color: #bada55;
+    color: black;
+}
+
+.btn-warning {
+    background-color: #da5578;
+    color: white;
+}
+
+.btn-danger {
+    background-color: #b655da;
+    color: white;
+}
+
+.btn-primary {
+    background-color: #bada55;
+    color: black;
+}
+
+.btn-success {
+    background-color: #bada55;
+    color: black;
+}
+
+.btn-warning:hover {
+    background-color: #da5578;
+    filter: brightness(95%);
+    border-color: #da5578;
+    color: white;
+}
+
+.btn-lg {
+    border-radius: 50% !important;
+    width: 90px;
+    height: 90px;
+}
+
+.btn-danger:hover {
+    background-color: #b655da;
+    filter: brightness(95%);
+    border-color: #b655da;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #bada55;
+    filter: brightness(95%);
+    border-color: #bada55;
+    color: black;
+}
+
+.btn-success:hover {
+    background-color: #bada55;
+    filter: brightness(95%);
+    border-color: #bada55;
+    color: black;
 }

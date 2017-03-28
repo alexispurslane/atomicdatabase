@@ -12,15 +12,22 @@ var BreakException = {};
 
 $(document).ready(function () {
     var $status = $("#status");
+    function updateStatus(t, error) {
+        if (error) {
+            $status.html('<div class="alert alert-danger" role="alert"><strong>Error:</strong> '+t+'</div>');
+        } else {
+            $status.html('<div class="alert alert-success" role="alert"><strong>'+t+'</strong></div>');
+        }
+    }
 
-    var s = "<thead> <tr id=\"a\"> ";
+    var s = "<thead class='facts'> <tr id=\"a\"> ";
     for (var i = 0; i < 5; i++) {
         s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
     }
     s += "</tr> </thead>";
     $("table").first().prepend(s);
-    $("input").first().prop("disabled", true);
-    $("input").first().prop("readonly", false);
+    $($("input").get(1)).prop("disabled", true);
+    $($("input").get(1)).prop("readonly", false);
 
     s = "<tr> ";
     for (var i = 0; i < 5; i++) {
@@ -28,7 +35,7 @@ $(document).ready(function () {
     }
     s += "</tr>";
     for (var i = 0; i < 4; i++)
-        $("tbody").append(s);
+        $("tbody.facts").append(s);
 
     // On each reload: Load data
     var reloadRequest = {
@@ -71,7 +78,7 @@ $(document).ready(function () {
                 }
             });
         });
-        $("tbody").children().each(function () {
+        $("tbody.facts").children().each(function () {
             var item = $(this).children().first();
             var index = $(this).index();
 
@@ -87,7 +94,7 @@ $(document).ready(function () {
         });
         console.log(entityOrder);
         console.log(database);
-        $("tbody").children().each(function () {
+        $("tbody.facts").children().each(function () {
             var row = $(this);
             database.forEach(function (e) {
                 console.log(row.children().first().children().first().val());
@@ -142,7 +149,7 @@ $(document).ready(function () {
     });
 
     var addRow = function () {
-        var cols = $("td").length / $("tr").length;
+        var cols = $("td").length / $(".facts > tr").length;
 
         var str = "<tr> "
         for (var i = 0; i < cols; i++) {
@@ -150,29 +157,29 @@ $(document).ready(function () {
         }
         str += "</tr>"
 
-        $("tbody").append(str);
-        $status.text("Row added.");
+        $("tbody.facts").append(str);
+        updateStatus("Row added.");
     }
 
     $("#add-row").click(addRow);
 
     var delRowBypass = function () {
-        if ($("tr").length < 2) return;
-        $("tr").last().remove();
-    }
+        if ($(".facts > tr").length < 2) return;
+        $(".facts > tr").last().remove();
+    };
 
     var delRow = function () {
-        if ($("tr").length < 2) {
-            $status.text("ERROR: Cannot delete only row.");
+        if ($(".facts > tr").length < 2) {
+            updateStatus("Cannot delete only row.", true);
             return;
         }
         if (confirm("Are you sure you want to delete a row?")) {
             var row = +prompt("Delete which row?");
             if (row < 1) {
-                $status.text("ERROR: Cannot delete Row 1.");
+                updateStatus("Cannot delete Row 1.", true);
                 return;
             }
-            var delRow = $("tr")[row];
+            var delRow = $(".facts > tr")[row];
             $(delRow).children().each(function () {
                 var colint = $(this).index();
                 if (colint == 0) return;
@@ -196,38 +203,38 @@ $(document).ready(function () {
                 });
             });
             $(delRow).remove();
-            $status.text("Row " + row + " deleted.");
+            updateStatus("Row " + row + " deleted.");
         }
     }
 
     $("#del-row").click(delRow);
 
     var addCol = function () {
-        $("tr").append(fieldSlot);
-        $status.text("Column added.");
+        $(".facts > tr").append(fieldSlot);
+        updateStatus("Column added.");
     }
 
     $("#add-col").click(addCol);
 
     var delColBypass = function () {
         if ($("td").length / $("tr").length < 2) return;
-        $("tr").each(function () {
+        $(".facts > tr").each(function () {
             $(this).children().last().remove();
         });
     }
 
     var delCol = function () {
-        if ($("td").length / $("tr").length < 2) {
-            $status.text("ERROR: Cannot delete only column.");
+        if ($("td").length / $(".facts > tr").length < 2) {
+            updateStatus("Cannot delete only column.", true);
             return;
         }
         if (confirm("Are you sure you want to delete a column?")) {
             var col = +prompt("Delete which column?");
             if (col < 1) {
-                $status.text("ERROR: Cannot delete Column 1.");
+                updateStatus("Cannot delete Column 1.", true);
                 return;
             }
-            $("tr").each(function () {
+            $(".facts > tr").each(function () {
                 if ($(this).prop("id") === "a") {
                     return;
                 }
@@ -253,7 +260,7 @@ $(document).ready(function () {
                 $(this).children()[col].remove();
             });
             $("#a").children()[col].remove();
-            $status.text("Column " + col + " deleted.");
+            updateStatus("Column " + col + " deleted.");
         }
     };
 
@@ -280,7 +287,7 @@ $(document).ready(function () {
                     $("#properties").html("");
                     $("#values").html("");
                     Object.keys(data.data[0]).forEach((k) => {
-                        $("#properties").append("<td>" + k + "</td>");
+                        $("#properties").append("<td><strong>" + k + "</strong></td>");
                         $("#values").append("<td>" + data.data[0][k] + "</td>");
                     });
                 } else {
