@@ -15,8 +15,14 @@ $(document).ready(function () {
     function updateStatus(t, error) {
         if (error) {
             $status.html('<div class="alert alert-danger" role="alert"><strong>Error:</strong> '+t+'</div>');
+            $status.hide().slideDown({
+                top: 45
+            }, 4000);
         } else {
             $status.html('<div class="alert alert-success" role="alert"><strong>'+t+'</strong></div>');
+            $status.hide().slideDown({
+                top: 45
+            }, 4000);
         }
     }
 
@@ -281,8 +287,7 @@ $(document).ready(function () {
             if (data.success) {
                 if (data.data.length > 0) {
                     var str = Object.values(data.data[0]).join(", ");
-                    $status.html(
-                        '<div class="alert alert-info" role="alert"><strong>Possible answers are</strong>: '+str+'</div>');
+                    $status.html("Possible answers are: " + str);
 
                     $("#properties").html("");
                     $("#values").html("");
@@ -292,13 +297,12 @@ $(document).ready(function () {
                     });
                 } else {
                     $status.html(
-                        '<div class="alert alert-warning" role="alert">\
-<strong>No data satisfied this query.</strong>\
- Either I need more data or one of your rules was incorrect, or it was contradictory.</div>');
+                        ' <strong>No data satisfied this query.</strong>\
+ Either I need more data or one of your rules was incorrect, or it was contradictory.', true);
                 }
             } else {
                 $status.html(
-                    '<div class="alert alert-danger" role="alert"><strong>I didn\'t understand that.</strong></div>');
+                    "I didn\'t understand that.");
             }
         });
     });

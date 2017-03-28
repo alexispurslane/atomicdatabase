@@ -49,7 +49,6 @@ table > thead > tr > td > input {
 }
 
 .btn {
-    font-size: 15px;
     font-weight: 500;
     line-height: 1;
     text-transform: uppercase;
@@ -89,56 +88,119 @@ table > thead > tr > td > input {
     color: black;
 }
 
-.btn-warning {
+.btn-toxic-warning {
     background-color: #da5578;
     color: white;
 }
 
-.btn-danger {
+.btn-toxic-danger {
     background-color: #b655da;
     color: white;
 }
 
-.btn-primary {
+.btn-toxic-primary {
     background-color: #bada55;
     color: black;
 }
 
-.btn-success {
+.btn-toxic-success {
     background-color: #bada55;
     color: black;
 }
 
-.btn-warning:hover {
+.btn-toxic-lg {
+    border-radius: 50% !important;
+    width: 90px;
+    height: 90px;
+}
+
+.btn-toxic-warning:hover {
     background-color: #da5578;
     filter: brightness(95%);
     border-color: #da5578;
     color: white;
 }
 
-.btn-lg {
-    border-radius: 50% !important;
-    width: 90px;
-    height: 90px;
-}
-
-.btn-danger:hover {
+.btn-toxic-danger:hover {
     background-color: #b655da;
     filter: brightness(95%);
     border-color: #b655da;
     color: white;
 }
 
-.btn-primary:hover {
+.btn-toxic-primary:hover {
     background-color: #bada55;
     filter: brightness(95%);
     border-color: #bada55;
     color: black;
 }
 
-.btn-success:hover {
+.btn-toxic-success:hover {
     background-color: #bada55;
     filter: brightness(95%);
     border-color: #bada55;
     color: black;
+}
+
+.btn-toxic-warning:focus {
+    background-color: #da5578;
+    filter: brightness(90%);
+    border-color: #da5578;
+    color: white;
+}
+
+.btn-toxic-danger:focus {
+    background-color: #b655da;
+    filter: brightness(90%);
+    border-color: #b655da;
+    color: white;
+}
+
+.btn-toxic-primary:focus {
+    background-color: #bada55;
+    filter: brightness(90%);
+    border-color: #bada55;
+    color: black;
+}
+
+.btn-toxic-success:focus {
+    background-color: #bada55;
+    filter: brightness(90%);
+    border-color: #bada55;
+    color: black;
+}
+
+.btn-toxic-warning:active {
+    background-color: #da5578;
+    filter: brightness(90%);
+    border-color: #da5578;
+    color: white;
+}
+
+.btn-toxic-danger:active {
+    background-color: #b655da;
+    filter: brightness(90%);
+    border-color: #b655da;
+    color: white;
+}
+
+.btn-toxic-primary:active {
+    background-color: #bada55;
+    filter: brightness(90%);
+    border-color: #bada55;
+    color: black;
+}
+
+.btn-toxic-success:active {
+    background-color: #bada55;
+    filter: brightness(90%);
+    border-color: #bada55;
+    color: black;
+}
+
+.btn:active {
+    background-image: none;
+    outline: 0;
+    -webkit-box-shadow: none;
+    box-shadow: none;
 }

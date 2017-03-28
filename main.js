@@ -175,7 +175,12 @@ const parseToAEV = (terms, matchingRule) => {
 };
 
 const satisfyQuery = (line) => {
-    return known.findValuations(splitByConj(line), known.dbize(db));
+    let s = splitByConj(line);
+    if (s) {
+        return known.findValuations(s, known.dbize(db));
+    } else {
+        return null;
+    }
 };
 
 // Handle requests
@@ -290,13 +295,21 @@ app.post('/', (req, res) => {
         break;
 
     case 'query':
-        let foundQuery = satisfyQuery(data.text);
+        if (data.text.length === 0 || typeof data.text !== 'string') {
+            res.send({
+                success: false,
+                updated: 'query-engine',
+                data: "Expected valid query."
+            });
+        } else {
+            let foundQuery = satisfyQuery(data.text);
 
-        res.send({
-            success: !!foundQuery,
-            updated: 'query-engine',
-            data: foundQuery
-        });
+            res.send({
+                success: !!foundQuery,
+                updated: 'query-engine',
+                data: foundQuery
+            });
+        }
         break;
 
     case 'rule':
