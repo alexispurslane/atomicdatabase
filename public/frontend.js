@@ -1,5 +1,4 @@
 // TODO:
-// Handle out of bound values (doesn't cause exceptions but still doesn't look good)
 // Tabbing goes to the next (and wraps around)
 // Enter = focusout
 // Reduce verbosity
@@ -7,19 +6,32 @@
 var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
 var baseURI = window.location.protocol + "//" + window.location.host + "/";
+var tips = [
+    'Columns are attributes, rows are entities, and cells are values.',
+    'Queries are just regular, natural language questions! No sweat.',
+    'Use rules to tell atomicdatabase what things are.',
+    'Use s-expressions in rules for a more concise experience.',
+    'Rules can be natural language too!'
+];
 
 var BreakException = {};
 
 $(document).ready(function () {
     var $status = $("#status");
-    function updateStatus(t, error) {
+    updateStatus(tips[Math.floor(Math.random()*tips.length)], false, true);
+    function updateStatus(t, error, tip) {
         if (error) {
             $status.html('<div class="alert alert-danger" role="alert"><strong>Error:</strong> '+t+'</div>');
             $status.hide().slideDown({
                 top: 45
             }, 4000);
+        } else if (tip) {
+            $status.html('<div class="alert alert-success" role="alert"><strong>Tip: </strong> '+t+'</div>');
+            $status.hide().slideDown({
+                top: 45
+            }, 4000);
         } else {
-            $status.html('<div class="alert alert-success" role="alert"><strong>'+t+'</strong></div>');
+            $status.html('<div class="alert alert-success" role="alert"><strong>Success!</strong> '+t+'</div>');
             $status.hide().slideDown({
                 top: 45
             }, 4000);
@@ -145,8 +157,10 @@ $(document).ready(function () {
             }
         };
         $.post(baseURI, data, function(data) {
-            console.log(data);
-        })
+            if (!data.success) {
+                updateStatus(data.data, true);
+            }
+        });
     });
 
     $(document.body).on('dblclick', ".disabled", function () {
@@ -157,15 +171,15 @@ $(document).ready(function () {
     var addRow = function () {
         var cols = $("td").length / $(".facts > tr").length;
 
-        var str = "<tr> "
+        var str = "<tr> ";
         for (var i = 0; i < cols; i++) {
             str += fieldSlot;
         }
-        str += "</tr>"
+        str += "</tr>";
 
         $("tbody.facts").append(str);
         updateStatus("Row added.");
-    }
+    };
 
     $("#add-row").click(addRow);
 
