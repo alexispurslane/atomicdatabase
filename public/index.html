@@ -4,6 +4,7 @@
         <title>Atomic Database by Raymond W. and Christopher D.</title>
         <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
         <link rel="stylesheet" type="text/css" href="theme.css">
+        <link rel="icon" href="./favicon.ico">
         <script src="./js/jquery-3.2.0.min.js"></script>
         <script src="frontend.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -30,17 +31,25 @@
             </table>
 
             <div class="table-control" style="padding: 5px; width:100%; position: fixed; bottom: 50px;">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr id="properties"></tr>
+                    </thead>
+                    <thead>
+                        <tr id="values"></tr>
+                    </thead>
+                </table>
                 <button class="btn btn-primary" id="add-row">Add Row</button>
                 <button class="btn btn-danger"  id="del-row">Delete Row</button>
                 <button class="btn btn-primary" id="add-col">Add Column</button>
                 <button class="btn btn-danger"  id="del-col">Delete Column</button>
-                <div class="input-group" style="float: right; width: 40%; padding-right: 5px;">
+                <div class="input-group">
                     <input type="text" class="query form-control" placeholder="Enter a query...">
                     <span class="input-group-btn">
                         <button class="btn btn-success" id="solve" type="button"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></button>
                     </span>
                 </div>
-                <pre id="status" style="display: block; width: 100%; padding-right: 5px;">Ready.</pre>
+                <div id="status"><div class="alert alert-success">Ready.</div></div>
             </div>
         </div>
     </body>

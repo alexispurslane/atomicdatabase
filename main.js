@@ -14,7 +14,7 @@
 const known = require('@shieldsbetter/known');
 const k = known.factory;
 
-const sexp = require('s-expression');
+const parseSexp = require('s-expression');
 
 const nlp = require('compromise');
 
@@ -35,6 +35,7 @@ let entities = {};
 
 let queries = [
     // Unification rules
+<<<<<<< HEAD
     '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) #Copula (#Value|(#Noun|#Gerund|#Adjective))',
     '#Copula (#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
     '#Copula (#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
@@ -43,127 +44,149 @@ let queries = [
     // Question rules
     '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective)',
     '(#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective)',
+=======
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Adjective|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    // Question rules
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
+>>>>>>> nlp+
 ];
 
-const varize = (title, term) => {
-    return term.map((exp) => {
-        if (exp[0].toUpperCase() === exp[0]) {
-            return k.placeholder(title+'-'+exp);
+const isUnderstood = (exp) => {
+    if (Array.isArray(exp)) {
+        return exp.every(isUnderstood);
+    } else {
+        return !!exp;
+    }
+};
+
+const splitByConj = (line) => {
+    const conj = nlp(line).terms().data().find(
+        x => x.tags.indexOf('Conjunction') !== -1);
+    if (conj !== undefined) {
+        console.log("Conjunction found!");
+        let loc = line.indexOf(conj.normal);
+        let size = conj.normal.length+1;
+
+        let car = line.substring(0, loc-1);
+        let cdr = line.substring(loc+size);
+        return k[conj.normal](parseFullyToAEV(car), splitByConj(cdr));
+    } else {
+        return parseFullyToAEV(line);
+    }
+};
+
+const parseExpers = (title, sexp) => {
+    console.log(sexp);
+    if (Array.isArray(sexp)) {
+        if (sexp[0] === "and" || sexp[0] === "or") {
+            return k[sexp[0]](...sexp.slice(1).map((x) => parseExpers(title, x)));
         } else {
-            return exp;
+            return sexp.map((x) => parseExpers(title, x));
+        }
+    } else {
+        if (sexp === sexp.toUpperCase() && isNaN(sexp)) {
+            return k.placeholder(title+"-"+sexp.toLowerCase());
+        } else if (sexp === undefined) {
+            return k.placeholder(title+"-"+uuidV4());
+        } else {
+            return sexp;
+        }
+    }
+};
+
+let allCompleteSexps = (buffer) => {
+    let parens = 0;
+    let sexps = [];
+    let sexp = '';
+    buffer.split('').forEach((char) => {
+        if (char === '(') parens++;
+        if (char === ')') parens--;
+        if (parens > 0 || char.replace(/\s+/, "") !== "") sexp += char;
+        if (parens === 0 && sexp !== "") { sexps.push(sexp); sexp = ""; }
+    });
+
+    return sexps.map(parseSexp);
+};
+
+const prepare = x => x.replace(/#.*$/gi, '').replace(/[{\[<]/gi, '(').replace(/[}\]>]/gi, ')');
+
+const addRule = (title, buf, flag) => {
+    if (flag === 'sexp' || flag === undefined) {
+        console.log("S-Expression");
+        const exprs = parseExpers(title, allCompleteSexps(prepare(buf)));
+        db.push(k.implies(...exprs));
+        return o;
+    } else if (flag === 'natural') {
+        console.log("Natural language");
+        let rules = [];
+        const lines = nlp(buf).statements().data().map(x => x.text);
+        console.log(lines);
+        lines.forEach((line) => {
+            rules.push(splitByConj(line));
+        });
+
+        console.log(rules);
+
+        db.push(k.implies(...rules));
+        return rules;
+    }
+    return false;
+};
+
+const parseFullyToAEV = (line) => {
+    let found = false;
+    return queries.map((ms, matchingRule) => {
+        const match = nlp(line).match(ms);
+        if (match.found && !found) {
+            console.log("Sentence matched rule " +matchingRule+": " + ms);
+            found = true;
+            return parseToAEV(match.terms(), matchingRule);
+        }
+        return undefined;
+    }).filter(x => x !== undefined)[0];
+};
+
+const parseToAEV = (terms, matchingRule) => {
+    let attribute, entity, value;
+    let dat = terms.data().filter(d => d.normal !== '');
+
+    if (matchingRule === 0) {
+        [value, attribute, entity] = dat;
+    } else if (matchingRule === 1) {
+        [attribute,, entity,, value] = dat;
+    } else if (matchingRule === 2) {
+        [, attribute, entity, value] = dat;
+    } else if (matchingRule === 3) {
+        [, entity,, attribute, value] = dat;
+    } else if (matchingRule === 4) {
+        [entity, attribute,, value] = dat;
+    } else if (matchingRule === 5) {
+        [attribute,, entity] = dat;
+    } else if (matchingRule === 6) {
+        [entity, attribute] = dat;
+    }
+
+    return [attribute, entity, value].map(v => {
+        if (v === undefined) {
+            return k.placeholder(entity.normal+"-"+attribute.normal);
+        }
+
+        let vt = v.text.replace(/'[a-z]/g, "");
+        if (vt === vt.toUpperCase() && isNaN(v.text)) {
+            return k.placeholder(v.normal.replace(/'[a-z]/g, ""));
+        } else {
+            return v.normal.replace(/'[a-z]/g, "");
         }
     });
 };
 
-const addRule = (title, buf, flag) => {
-    if (flag == 'sexp' || flag === undefined) {
-        console.log(buf);
-        const terms = buf.split("\n").map((buf) => sexp(buf));
-        console.log(terms);
-        let expers = terms.map((term) => {
-            const newterm = varize(title, term);
-
-            if (term[0] == 'and' || term[0] == 'or') {
-                const rest = newterm.slice(1).map((x) => varize(title, x));
-                return k[term[0]](...rest);
-            } else {
-                return newterm;
-            }
-        });
-        console.log(expers);
-        db.push(k.implies(
-            ...expers
-        ));
-        return expers;
-    } else if (flag === 'natural') {
-        let rules = [];
-        const lines = buf.split('\n');
-        const matchers = queries.slice(2);
-        lines.forEach((line) => {
-            matchers.find((ms, matchingRule) => {
-                const match = nlp(line).match(ms);
-                if (match.found) {
-                    if (matchingRule == 4) {
-                        const [attribute, _, entity] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 5) {
-                        const [entity, attribute] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 3) {
-                        const [entity, attribute, _, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 0) {
-                        const [attribute, prep, entity, _, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 1) {
-                        const [cop, attribute, entity, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    } else if (matchingRule == 2) {
-                        const [cop, entity, prep, attribute, value] = terms.data();
-                        let v = value.normal;
-                        if (value.bestTag === 'TitleCase') {
-                            v = k.placeholder(value.normal);
-                        }
-                        rules.push([attribute.normal, entity.normal, v]);
-                    }
-                    return rules;
-                }
-                return false;
-            });
-        });
-
-        db.push(k.implies(...rules));
-    }
-};
-
-const satisfyQuery = (terms, matchingRule) => {
-    let request;
-    var dat = terms.data().filter(d => d.normal !== '');
-    if (matchingRule == 4) {
-        const [attribute, _, entity] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''),
-                   k.placeholder(uuidV4())];
-    } else if (matchingRule == 5) {
-        const [entity, attribute] = dat;
-        console.log(terms)
-        request = [attribute.normal, entity.normal.replace('\'s', ''),
-                   k.placeholder(uuidV4())];
-    } else if (matchingRule == 3) {
-        const [entity, attribute, _, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 0) {
-        const [attribute, prep, entity, _, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 1) {
-        const [cop, attribute, entity, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    } else if (matchingRule == 2) {
-        const [cop, entity, prep, attribute, value] = dat;
-        request = [attribute.normal, entity.normal.replace('\'s', ''), value.normal];
-    }
-
-    console.log(request);
-    return known.findValuations(request, known.dbize(db));
+const satisfyQuery = (line) => {
+    return known.findValuations(splitByConj(line), known.dbize(db));
 };
 
 // Handle requests
@@ -179,7 +202,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: null,
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -207,7 +230,7 @@ app.post('/', (req, res) => {
         }
         let alreadyPresent = false;
         db.forEach((el, i, db) => {
-            if (a == el[0] && e == el[1]) {
+            if (a === el[0] && e === el[1]) {
                 db[i] = [a, e, v];
                 alreadyPresent = true;
             }
@@ -220,7 +243,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -245,7 +268,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -270,7 +293,7 @@ app.post('/', (req, res) => {
             success: true,
             updated: 'database',
             data: {
-                database: db.filter((d) => Array.isArray(d)),
+                database: db.filter(d => Array.isArray(d)),
                 attrOrder: attrs,
                 entityOrder: entities
             }
@@ -278,20 +301,7 @@ app.post('/', (req, res) => {
         break;
 
     case 'query':
-        let foundQuery = null;
-        console.log(data.text);
-
-        queries.find((ms, i) => {
-            console.log("Testing format " + i + ": " + ms);
-            let match = nlp(data.text).match(ms);
-            if (match.found) {
-                console.log("Sentence matched!");
-                foundQuery = satisfyQuery(match.terms(), i);
-                console.log("Result is: " + foundQuery);
-                return true;
-            }
-            return false;
-        });
+        let foundQuery = satisfyQuery(data.text);
 
         res.send({
             success: !!foundQuery,
@@ -301,13 +311,32 @@ app.post('/', (req, res) => {
         break;
 
     case 'rule':
-        const successful = addRule(data.title, data.text, data.flag);
-        rules[data.title] = data;
+        const results = addRule(data.title, data.text, data.flag);
+        const successful = isUnderstood(results);
+
+        if (successful) {
+            data.tree = results;
+            data.index = db.length - 1;
+            rules[data.title] = data;
+        }
 
         res.send({
-            success: !!successful,
+            success: successful,
             updated: 'rules',
-            data: successful
+            data: results
+        });
+        break;
+
+    case 'delete-rule':
+        let indb = data.title in rules;
+        if (indb) {
+            console.log("deleting " + data.title);
+            delete db[rules[data.title].index];
+            delete rules[data.title];
+        }
+        res.send({
+            success: indb,
+            updated:'rules'
         });
         break;
 
