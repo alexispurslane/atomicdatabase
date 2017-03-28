@@ -21,17 +21,17 @@ $(document).ready(function () {
     updateStatus(tips[Math.floor(Math.random()*tips.length)], false, true);
     function updateStatus(t, error, tip) {
         if (error) {
-            $status.html('<div class="alert alert-danger" role="alert"><strong>Error:</strong> '+t+'</div>');
+            $status.html('<div class="alert alert-danger" role="alert"><span class="glyphicon glyphicon-remove" aria-hidden="true"></span><strong> Error:</strong> '+t+'</div>');
             $status.hide().slideDown({
                 top: 45
             }, 4000);
         } else if (tip) {
-            $status.html('<div class="alert alert-success" role="alert"><strong>Tip: </strong> '+t+'</div>');
+            $status.html('<div class="alert alert-success" role="alert"><span class="glyphicon glyphicon-thumbs-up" aria-hidden="true"></span><strong> Tip: </strong> '+t+'</div>');
             $status.hide().slideDown({
                 top: 45
             }, 4000);
         } else {
-            $status.html('<div class="alert alert-success" role="alert"><strong>Success!</strong> '+t+'</div>');
+            $status.html('<div class="alert alert-success" role="alert"><span class="glyphicon glyphicon-ok" aria-hidden="true"></span><strong> Success!</strong> '+t+'</div>');
             $status.hide().slideDown({
                 top: 45
             }, 4000);
