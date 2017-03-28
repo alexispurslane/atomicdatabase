@@ -35,16 +35,6 @@ let entities = {};
 
 let queries = [
     // Unification rules
-<<<<<<< HEAD
-    '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) #Copula (#Value|(#Noun|#Gerund|#Adjective))',
-    '#Copula (#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
-    '#Copula (#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective) (#Value|(#Noun|#Gerund|#Adjective))',
-    '(#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective) #Copula (#Value|(#Noun|#Gerund|#Adjective))',
-
-    // Question rules
-    '(#Noun|#Gerund|#Adjective) #Preposition (#Noun|#Gerund|#Adjective)',
-    '(#Noun|#Gerund|#Adjective) (#Noun|#Gerund|#Adjective)',
-=======
     '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
     '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Adjective|#Acronym)',
     '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
@@ -53,7 +43,6 @@ let queries = [
     // Question rules
     '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
     '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
->>>>>>> nlp+
 ];
 
 const isUnderstood = (exp) => {
