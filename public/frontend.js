@@ -297,7 +297,7 @@ $(document).ready(function () {
             if (data.success) {
                 if (data.data.length > 0) {
                     var str = Object.values(data.data[0]).join(", ");
-                    $status.html("Possible answers are: " + str);
+                    updateStatus("Possible answers are: " + str);
 
                     $("#properties").html("");
                     $("#values").html("");
@@ -306,13 +306,22 @@ $(document).ready(function () {
                         $("#values").append("<td>" + data.data[0][k] + "</td>");
                     });
                 } else {
-                    $status.html(
+                    updateStatus(
                         ' <strong>No data satisfied this query.</strong>\
  Either I need more data or one of your rules was incorrect, or it was contradictory.', true);
                 }
             } else {
-                $status.html(
-                    "I didn\'t understand that.");
+                updateStatus("I didn\'t understand that.", true);
+            }
+        });
+    });
+
+    $("#save").click(function () {
+        $.post(baseURI, { type: 'save' }, function (data) {
+            if (data.success) {
+                updateStatus("Database saved.");
+            } else {
+                updateStatus("No database specified to be saved to.", true);
             }
         });
     });
