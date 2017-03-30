@@ -109,9 +109,11 @@ table > thead > tr > td > input {
 }
 
 .btn-toxic-lg {
+    font-size: 23px;
     border-radius: 50% !important;
-    width: 90px;
-    height: 90px;
+    width: 75px;
+    height: 75px;
+    box-shadow: 2px 2px 13px black;
 }
 
 .btn-toxic-warning:hover {
@@ -203,4 +205,17 @@ table > thead > tr > td > input {
     outline: 0;
     -webkit-box-shadow: none;
     box-shadow: none;
+}
+
+.sidebar {
+    position: fixed;
+    left: 5px;
+    top: 106px;
+    width: 15%;
+}
+.list-group-item > .glyphicon {
+    padding: 2px;
+}
+.glyphicon.inactive {
+    color: grey;
 }

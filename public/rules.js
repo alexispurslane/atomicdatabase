@@ -1,22 +1,48 @@
 function addRule(title, body) {
-    $(".rules").append('<div class="rule list-group-item">\
-        <h4 class="list-group-item-heading"><input style="font-size: inherit;" value="'+title+'" type="text" class="form-control"/></h1>\
-        <select>\
-            <option value="natural">Natural Language</option>\
-            <option value="sexp">S-Expressions (pro)</option>\
-        </select>\
-        <textarea rows=15 class="form-control code">'+body+'</textarea>\
-        <button class="btn btn-success submit toolbar" type="button">\
-            <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>\
-        </button>\
-        <button class="btn btn-danger delete toolbar" type="button">\
-            <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>\
-        </button>\
-      </div>');
+    title = title.trim();
+    if (title.length !== 0) {
+        $('.sidebar').append('<a href="#'+title+'" class="list-group-item">\
+                    '+title+'\
+                    <span class="glyphicon glyphicon-check pull-right" id="'+title+'-toggle" aria-hidden="true"></span>\
+                </a>');
+    }
+    $(".rules").append('<a name="'+title+'"></a><div id="'+title+'-panel" class="panel panel-default">\
+            <div class="rule panel-heading">\
+                <h3 class="panel-title"><input style="font-size: inherit;" value="'+title+'" type="text" class="form-control title"/></h3>\
+            </div>\
+            <div class="panel-body">\
+                <select class="format">\
+                    <option value="natural">Natural Language</option>\
+                    <option value="sexp">S-Expressions (pro)</option>\
+                </select>\
+                <textarea rows=15 class="form-control code">'+body+'</textarea>\
+                <button class="btn btn-success submit toolbar" type="button">\
+                    <span class="glyphicon glyphicon-ok" aria-hidden="true"></span>\
+                </button>\
+                <button class="btn btn-danger delete toolbar" type="button">\
+                    <span class="glyphicon glyphicon-remove" aria-hidden="true"></span>\
+                </button>\
+            </div>\
+        </div>');
+
+    $('#'+title+'-toggle').click(function () {
+        if ($(this).hasClass('glyphicon-unchecked')) {
+            $(this).removeClass('glyphicon-unchecked');
+            $(this).addClass('glyphicon-check');
+        } else {
+            $(this).addClass('glyphicon-unchecked');
+            $(this).removeClass('glyphicon-check');
+        }
+        $('#'+title+'-panel').toggle(800);
+    });
 }
 
 $(document).ready(function () {
     var baseURI = window.location.protocol + "//" + window.location.host + "/";
+
+    window.addEventListener("hashchange", function () {
+        window.scrollTo(window.scrollX, window.scrollY - 100);
+    });
 
     $.post(baseURI, {'type': 'rules'}, function (res) {
         var keys = Object.keys(res.data);
@@ -28,11 +54,14 @@ $(document).ready(function () {
     });
 
     $(document.body).on('click', ".submit", function () {
+        var p = $(this).parent().parent();
+        var title = $(p.find('.title')[0]).val();
+        var text = $(p.find('.code')[0]).val();
         var data = {
             'type': 'rule',
-            'text': $($(this).parent().children()[2]).val(),
-            'title': $($($(this).parent().children()[0]).children()[0]).val(),
-            'flag': $($(this).parent().children()[1]).val()
+            'text': text,
+            'title': title,
+            'flag': $(p.find('.format')[0]).val()
         };
         $.post(baseURI, data, function (res) {
             console.log(res);
@@ -47,6 +76,8 @@ $(document).ready(function () {
                 $("#status > .alert").addClass('alert-danger');
                 $("#status > .alert").html("<strong>An error occured: </strong> Your rule could not be parsed.");
             }
+            p.remove();
+            addRule(title, text);
         });
     });
 

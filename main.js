@@ -19,6 +19,7 @@ const parseSexp = require('s-expression');
 const nlp = require('compromise');
 
 const fs = require('fs');
+const process = require('process');
 const path = require('path');
 const uuidV4 = require('uuid/v4');
 
@@ -26,12 +27,24 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
 
-
 // For display purposes, remember that facts are held as AEV
 let db = [];
 let attrs = {};
 let rules = {};
 let entities = {};
+
+if (process.argv.length > 2 && typeof process.argv[2] === 'string') {
+    let file = fs.readFileSync(process.argv[2], "utf8");
+    if (file.trim() !== '') {
+        let data = JSON.parse(file);
+        if (data.db && data.attrs && data.rules && data.entities) {
+            db = data.db;
+            attrs = data.attrs;
+            rules = data.rules;
+            entities = data.entities;
+        }
+    }
+}
 
 let queries = [
     // Unification rules
@@ -105,6 +118,11 @@ let allCompleteSexps = (buffer) => {
 const prepare = x => x.replace(/#.*$/gi, '').replace(/[{\[<]/gi, '(').replace(/[}\]>]/gi, ')');
 
 const addRule = (title, buf, flag) => {
+    console.log();
+    console.log("Rule: " + title);
+    console.log("Format: " + flag);
+    console.log("Text: " + buf);
+    console.log();
     if (flag === 'sexp' || flag === undefined) {
         console.log("S-Expression");
         const exprs = parseExpers(title, allCompleteSexps(prepare(buf)));
@@ -326,6 +344,29 @@ app.post('/', (req, res) => {
             success: successful,
             updated: 'rules',
             data: results
+        });
+        break;
+
+    case 'save':
+        if (process.argv.length > 2 && typeof process.argv[2] === 'string') {
+            const data = {
+                db: db,
+                attrs: attrs,
+                entities: entities,
+                rules: rules
+            };
+            fs.writeFileSync(process.argv[2], JSON.stringify(data));
+            res.send({
+                success: true,
+                updated: 'file',
+                data: process.argv[2]
+            });
+        }
+
+        res.send({
+            success: false,
+            updated: 'file',
+            data: 'Server has no file to save to.'
         });
         break;
 
