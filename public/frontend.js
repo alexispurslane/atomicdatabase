@@ -193,38 +193,36 @@ $(document).ready(function () {
             updateStatus("Cannot delete only row.", true);
             return;
         }
-        if (confirm("Are you sure you want to delete a row?")) {
-            var row = +prompt("Delete which row?");
-            if (row < 1) {
-                updateStatus("Cannot delete Row 1.", true);
-                return;
-            }
-            var delRow = $(".facts > tr")[row];
-            $(delRow).children().each(function () {
-                var colint = $(this).index();
-                if (colint == 0) return;
-                var colint = $(this).index();
-                var rowVal = $(this).parent().children().first().children().first().val();
-                // console.log(rowVal);
-                var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
-                // console.log(colVal);
-                console.log([colVal, rowVal, $(this).children().first().val()]);
-                var data = {
-                    'type': 'delete-row',
-                    'text': $(this).children().first().val(),
-                    'tableUpdate': {
-                        'row': rowVal,
-                        'col': colVal,
-                        'value': $(this).children().first().val()
-                    }
-                };
-                $.post(baseURI, data, function(data) {
-                    console.log(data);
-                });
-            });
-            $(delRow).remove();
-            updateStatus("Row " + row + " deleted.");
+        var row = +prompt("Delete which row?");
+        if (row < 1) {
+            updateStatus("Cannot delete Row 1.", true);
+            return;
         }
+        var delRow = $(".facts > tr")[row];
+        $(delRow).children().each(function () {
+            var colint = $(this).index();
+            if (colint == 0) return;
+            var colint = $(this).index();
+            var rowVal = $(this).parent().children().first().children().first().val();
+            // console.log(rowVal);
+            var colVal = $("#a").children().slice(colint, colint+1).children().first().val();
+            // console.log(colVal);
+            console.log([colVal, rowVal, $(this).children().first().val()]);
+            var data = {
+                'type': 'delete-row',
+                'text': $(this).children().first().val(),
+                'tableUpdate': {
+                    'row': rowVal,
+                    'col': colVal,
+                    'value': $(this).children().first().val()
+                }
+            };
+            $.post(baseURI, data, function(data) {
+                console.log(data);
+            });
+        });
+        $(delRow).remove();
+        updateStatus("Row " + row + " deleted.");
     }
 
     $("#del-row").click(delRow);
@@ -248,40 +246,38 @@ $(document).ready(function () {
             updateStatus("Cannot delete only column.", true);
             return;
         }
-        if (confirm("Are you sure you want to delete a column?")) {
-            var col = +prompt("Delete which column?");
-            if (col < 1) {
-                updateStatus("Cannot delete Column 1.", true);
+        var col = +prompt("Delete which column?");
+        if (col < 1) {
+            updateStatus("Cannot delete Column 1.", true);
+            return;
+        }
+        $(".facts > tr").each(function () {
+            if ($(this).prop("id") === "a") {
                 return;
             }
-            $(".facts > tr").each(function () {
-                if ($(this).prop("id") === "a") {
-                    return;
+            var delCol = $(this).children()[col];
+            var rowint = $(this).parent().index();
+            var rowVal = $(delCol).parent().children().first().children().first().val();
+            // console.log(rowVal);
+            var colVal = $($("#a").children()[col]).children().first().val();
+            // console.log(colVal);
+            console.log([colVal, rowVal, $(delCol).children().first().val()]);
+            var data = {
+                'type': 'delete-col',
+                'text': $(delCol).children().first().val(),
+                'tableUpdate': {
+                    'row': rowVal,
+                    'col': colVal,
+                    'value': $(delCol).children().first().val()
                 }
-                var delCol = $(this).children()[col];
-                var rowint = $(this).parent().index();
-                var rowVal = $(delCol).parent().children().first().children().first().val();
-                // console.log(rowVal);
-                var colVal = $($("#a").children()[col]).children().first().val();
-                // console.log(colVal);
-                console.log([colVal, rowVal, $(delCol).children().first().val()]);
-                var data = {
-                    'type': 'delete-col',
-                    'text': $(delCol).children().first().val(),
-                    'tableUpdate': {
-                        'row': rowVal,
-                        'col': colVal,
-                        'value': $(delCol).children().first().val()
-                    }
-                };
-                $.post(baseURI, data, function(data) {
-                    console.log(data);
-                });
-                $(this).children()[col].remove();
+            };
+            $.post(baseURI, data, function(data) {
+                console.log(data);
             });
-            $("#a").children()[col].remove();
-            updateStatus("Column " + col + " deleted.");
-        }
+            $(this).children()[col].remove();
+        });
+        $("#a").children()[col].remove();
+        updateStatus("Column " + col + " deleted.");
     };
 
     $("#del-col").click(delCol);

@@ -211,7 +211,7 @@ table > thead > tr > td > input {
     position: fixed;
     left: 5px;
     top: 106px;
-    width: 15%;
+    width: 10%;
 }
 .list-group-item > .glyphicon {
     padding: 2px;
