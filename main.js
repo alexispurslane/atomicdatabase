@@ -11,14 +11,7 @@
   { 'index': ..., 'value': ... }
 */
 
-const known = require('@shieldsbetter/known');
-const k = known.factory;
 
-const parseSexp = require('s-expression');
-
-const nlp = require('compromise');
-
-const fs = require('fs');
 const process = require('process');
 const path = require('path');
 const uuidV4 = require('uuid/v4');
@@ -26,377 +19,186 @@ const uuidV4 = require('uuid/v4');
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
-
-// For display purposes, remember that facts are held as AEV
-let db = [];
-let attrs = {};
-let rules = {};
-let entities = {};
+const engine = require("./engine");
 
 if (process.argv.length > 2 && typeof process.argv[2] === 'string') {
-    let file = fs.readFileSync(process.argv[2], "utf8");
-    if (file.trim() !== '') {
-        let data = JSON.parse(file);
-        if (data.db && data.attrs && data.rules && data.entities) {
-            db = data.db;
-            attrs = data.attrs;
-            rules = data.rules;
-            entities = data.entities;
-        }
-    }
+    engine.loadDatabase(process.argv[2]);
 }
-
-let queries = [
-    // Unification rules
-    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Prepositon (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Value|#Noun|#Gerund|#Adjective|#Acronym)',
-    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-    '#Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym) #Copula (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-    // Question rules
-    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) #Preposition (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-    '(#Noun|#Gerund|#Adjective|#Value|#Acronym) (#Noun|#Gerund|#Adjective|#Value|#Acronym)',
-];
-
-const isUnderstood = (exp) => {
-    if (Array.isArray(exp)) {
-        return exp.every(isUnderstood);
-    } else {
-        return !!exp;
-    }
-};
-
-const splitByConj = (line) => {
-    const conj = nlp(line).terms().data().find(
-        x => x.tags.indexOf('Conjunction') !== -1);
-    if (conj !== undefined) {
-        console.log("Conjunction found!");
-        let loc = line.indexOf(conj.normal);
-        let size = conj.normal.length+1;
-
-        let car = line.substring(0, loc-1);
-        let cdr = line.substring(loc+size);
-        return k[conj.normal](parseFullyToAEV(car), splitByConj(cdr));
-    } else {
-        return parseFullyToAEV(line);
-    }
-};
-
-const parseExpers = (title, sexp) => {
-    console.log(sexp);
-    if (Array.isArray(sexp)) {
-        if (sexp[0] === "and" || sexp[0] === "or") {
-            return k[sexp[0]](...sexp.slice(1).map((x) => parseExpers(title, x)));
-        } else {
-            return sexp.map((x) => parseExpers(title, x));
-        }
-    } else {
-        if (sexp === sexp.toUpperCase() && isNaN(sexp)) {
-            return k.placeholder(title+"-"+sexp.toLowerCase());
-        } else if (sexp === undefined) {
-            return k.placeholder(title+"-"+uuidV4());
-        } else {
-            return sexp;
-        }
-    }
-};
-
-let allCompleteSexps = (buffer) => {
-    let parens = 0;
-    let sexps = [];
-    let sexp = '';
-    buffer.split('').forEach((char) => {
-        if (char === '(') parens++;
-        if (char === ')') parens--;
-        if (parens > 0 || char.replace(/\s+/, "") !== "") sexp += char;
-        if (parens === 0 && sexp !== "") { sexps.push(sexp); sexp = ""; }
-    });
-
-    return sexps.map(parseSexp);
-};
-
-const prepare = x => x.replace(/#.*$/gi, '').replace(/[{\[<]/gi, '(').replace(/[}\]>]/gi, ')');
-
-const addRule = (title, buf, flag) => {
-    console.log();
-    console.log("Rule: " + title);
-    console.log("Format: " + flag);
-    console.log("Text: " + buf);
-    console.log();
-    if (flag === 'sexp' || flag === undefined) {
-        console.log("S-Expression");
-        const exprs = parseExpers(title, allCompleteSexps(prepare(buf)));
-        db.push(k.implies(...exprs));
-        return o;
-    } else if (flag === 'natural') {
-        console.log("Natural language");
-        let rules = [];
-        const lines = nlp(buf).statements().data().map(x => x.text);
-        console.log(lines);
-        lines.forEach((line) => {
-            rules.push(splitByConj(line));
-        });
-
-        console.log(rules);
-
-        db.push(k.implies(...rules));
-        return rules;
-    }
-    return false;
-};
-
-const parseFullyToAEV = (line) => {
-    let found = false;
-    return queries.map((ms, matchingRule) => {
-        const match = nlp(line).match(ms);
-        if (match.found && !found) {
-            console.log("Sentence matched rule " +matchingRule+": " + ms);
-            found = true;
-            return parseToAEV(match.terms(), matchingRule);
-        }
-        return undefined;
-    }).filter(x => x !== undefined)[0];
-};
-
-const parseToAEV = (terms, matchingRule) => {
-    let attribute, entity, value;
-    let dat = terms.data().filter(d => d.normal !== '');
-
-    if (matchingRule === 0) {
-        [value, attribute, entity] = dat;
-    } else if (matchingRule === 1) {
-        [attribute,, entity,, value] = dat;
-    } else if (matchingRule === 2) {
-        [, attribute, entity, value] = dat;
-    } else if (matchingRule === 3) {
-        [, entity,, attribute, value] = dat;
-    } else if (matchingRule === 4) {
-        [entity, attribute,, value] = dat;
-    } else if (matchingRule === 5) {
-        [attribute,, entity] = dat;
-    } else if (matchingRule === 6) {
-        [entity, attribute] = dat;
-    }
-
-    return [attribute, entity, value].map(v => {
-        if (v === undefined) {
-            return k.placeholder(entity.normal+"-"+attribute.normal);
-        }
-
-        let vt = v.text.replace(/'[a-z]/g, "");
-        if (vt === vt.toUpperCase() && isNaN(v.text)) {
-            return k.placeholder(v.normal.replace(/'[a-z]/g, ""));
-        } else {
-            return v.normal.replace(/'[a-z]/g, "");
-        }
-    });
-};
-
-const satisfyQuery = (line) => {
-    let s = splitByConj(line);
-    if (s) {
-        return known.findValuations(s, known.dbize(db));
-    } else {
-        return null;
-    }
-};
-
 // Handle requests
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
 }));
 app.post('/', (req, res) => {
-    var data = req.body;
-    switch (data.type) {
-    case 'reload':
-        res.send({
-            success: true,
-            updated: null,
-            data: {
-                database: db.filter(d => Array.isArray(d)),
-                attrOrder: attrs,
-                entityOrder: entities
-            }
-        });
-        break;
-    case 'table':
-        const [a, e, v] = [data.tableUpdate.col.value || data.tableUpdate.col,
-                           data.tableUpdate.row.value || data.tableUpdate.row,
-                           data.tableUpdate.value];
-
-        // Keep track
-        if (data.tableUpdate.col.index) {
-            attrs[a] = data.tableUpdate.col.index;
-            entities[e] = data.tableUpdate.row.index;
-        }
-
-        if (typeof a !== 'string' || typeof e !== 'string' || typeof v !== 'string' ||
-            a === '' || e === '' || v === '') {
-            res.send({
-                success: false,
-                updated: 'database',
-                data: 'Expecting valid Attributes, Entities, and Values'
-            });
-            return;
-        }
-        let alreadyPresent = false;
-        db.forEach((el, i, db) => {
-            if (a === el[0] && e === el[1]) {
-                db[i] = [a, e, v];
-                alreadyPresent = true;
-            }
-        });
-        if (!alreadyPresent) {
-            db.push([a, e, v]);
-        }
-
-        res.send({
-            success: true,
-            updated: 'database',
-            data: {
-                database: db.filter(d => Array.isArray(d)),
-                attrOrder: attrs,
-                entityOrder: entities
-            }
-        });
-        break;
-
-    case 'delete-row':
-        const row = data.tableUpdate.row;
-        if (typeof row !== "string") {
-            res.send({
-                success: false,
-                updated: 'database',
-                data: 'Expecting a valid row.'
-            });
-            return;
-        }
-        delete entities[data.tableUpdate.row];
-        db = db.filter((el) => {
-            return el[1] !== row;
-        });
-        res.send({
-            success: true,
-            updated: 'database',
-            data: {
-                database: db.filter(d => Array.isArray(d)),
-                attrOrder: attrs,
-                entityOrder: entities
-            }
-        });
-        break;
-
-    case 'delete-col':
-        const col = data.tableUpdate.col;
-        if (typeof col !== "string") {
-            res.send({
-                success: false,
-                updated: 'database',
-                data: 'Expecting a valid column.'
-            });
-            return;
-        }
-        delete attrs[data.tableUpdate.col];
-        db = db.filter((el) => {
-            return el[0] !== col;
-        });
-        res.send({
-            success: true,
-            updated: 'database',
-            data: {
-                database: db.filter(d => Array.isArray(d)),
-                attrOrder: attrs,
-                entityOrder: entities
-            }
-        });
-        break;
-
-    case 'query':
-        if (data.text.length === 0 || typeof data.text !== 'string') {
-            res.send({
-                success: false,
-                updated: 'query-engine',
-                data: "Expected valid query."
-            });
-        } else {
-            let foundQuery = satisfyQuery(data.text);
-
-            res.send({
-                success: !!foundQuery,
-                updated: 'query-engine',
-                data: foundQuery
-            });
-        }
-        break;
-
-    case 'rule':
-        const results = addRule(data.title, data.text, data.flag);
-        const successful = isUnderstood(results);
-
-        if (successful) {
-            data.tree = results;
-            data.index = db.length - 1;
-            rules[data.title] = data;
-        }
-
-        res.send({
-            success: successful,
-            updated: 'rules',
-            data: results
-        });
-        break;
-
-    case 'save':
-        if (process.argv.length > 2 && typeof process.argv[2] === 'string') {
-            const data = {
-                db: db,
-                attrs: attrs,
-                entities: entities,
-                rules: rules
-            };
-            fs.writeFileSync(process.argv[2], JSON.stringify(data));
+    const req_switch = {
+        'reload': (data) => {
+            const [d, as, es] = engine.safeDB();
             res.send({
                 success: true,
+                updated: null,
+                data: {
+                    database: d,
+                    attrOrder: as,
+                    entityOrder: es
+                }
+            });
+        },
+        'table': (data) => {
+            const [a, e, v] = [data.tableUpdate.col.value, data.tableUpdate.row.value, data.tableUpdate.value];
+
+            if (typeof a !== 'string' || typeof e !== 'string' || typeof v !== 'string' ||
+                a === '' || e === '' || v === '') {
+                res.send({
+                    success: false,
+                    updated: 'database',
+                    data: 'Expecting valid Attributes, Entities, and Values'
+                });
+                return;
+            }
+
+            // Keep track
+            engine.updateDatabase(a, e, v, data.tableUpdate.col.index, data.tableUpdate.row.index);
+            const [d, as, es] = engine.safeDB();
+
+            res.send({
+                success: true,
+                updated: 'database',
+                data: {
+                    database: d,
+                    attrOrder: as,
+                    entityOrder: es
+                }
+            });
+        },
+
+        'delete-row': (data) => {
+            const row = data.tableUpdate.row;
+            if (typeof row !== "string") {
+                res.send({
+                    success: false,
+                    updated: 'database',
+                    data: 'Expecting a valid row.'
+                });
+                return;
+            }
+
+            engine.deleteRow(row);
+            const [d, as, es] = engine.safeDB();
+            res.send({
+                success: true,
+                updated: 'database',
+                data: {
+                    database: d,
+                    attrOrder: as,
+                    entityOrder: es
+                }
+            });
+        },
+
+        'delete-col': (data) => {
+            const col = data.tableUpdate.col;
+            if (typeof col !== "string") {
+                res.send({
+                    success: false,
+                    updated: 'database',
+                    data: 'Expecting a valid column.'
+                });
+                return;
+            }
+
+            engine.deleteCol(col);
+            const [d, as, es] = engine.safeDB();
+            res.send({
+                success: true,
+                updated: 'database',
+                data: {
+                    database: d,
+                    attrOrder: as,
+                    entityOrder: es
+                }
+            });
+        },
+
+        'query': (data) => {
+            if (data.text.length === 0 || typeof data.text !== 'string') {
+                res.send({
+                    success: false,
+                    updated: 'query-engine',
+                    data: "Expected valid query."
+                });
+            } else {
+                let foundQuery = engine.satisfyQuery(data.text);
+
+                res.send({
+                    success: !!foundQuery,
+                    updated: 'query-engine',
+                    data: foundQuery
+                });
+            }
+        },
+
+        'rule': (data) => {
+            const results = engine.addRule(data.title, data.text, data.flag);
+            const successful = engine.isUnderstood(results);
+
+            if (successful) {
+                engine.rememberRule(results, data);
+            }
+
+            res.send({
+                success: successful,
+                updated: 'rules',
+                data: results
+            });
+        },
+
+        'save': (data) => {
+            if (process.argv.length > 2 && typeof process.argv[2] === 'string') {
+                engine.saveDatabase();
+                res.send({
+                    success: true,
+                    updated: 'file',
+                    data: process.argv[2]
+                });
+            }
+
+            res.send({
+                success: false,
                 updated: 'file',
-                data: process.argv[2]
+                data: 'Server has no file to save to.'
+            });
+        },
+
+        'delete-rule': (data) => {
+            res.send({
+                success: engine.deleteRule(data.title),
+                updated:'rules'
+            });
+        },
+
+        'rules': (data) => {
+            res.send({
+                success: true,
+                updated: null,
+                data: engine.getRules()
+            });
+        },
+
+        'default': (data) => {
+            res.send({
+                success: false,
+                updated: null,
+                data: 'Unknown command.'
             });
         }
+    };
 
-        res.send({
-            success: false,
-            updated: 'file',
-            data: 'Server has no file to save to.'
-        });
-        break;
-
-    case 'delete-rule':
-        let indb = data.title in rules;
-        if (indb) {
-            console.log("deleting " + data.title);
-            delete db[rules[data.title].index];
-            delete rules[data.title];
-        }
-        res.send({
-            success: indb,
-            updated:'rules'
-        });
-        break;
-
-    case 'rules':
-        res.send({
-            success: true,
-            updated: null,
-            data: rules
-        });
-        break;
-
-    default:
-        res.send({
-            success: false,
-            updated: null,
-            data: 'Unknown command.'
-        });
+    if (req_switch.hasOwnProperty(req.body.type)) {
+        console.log("Calling " + req.body.type);
+        req_switch[req.body.type](req.body);
+    } else {
+        console.log("Unrecognized hook " + req.body.type);
+        req_switch['default'](req.body);
     }
 });
 
