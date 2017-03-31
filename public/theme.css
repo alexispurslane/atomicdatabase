@@ -1,18 +1,3 @@
-.disabled {
-    box-shadow: none !important;
-    border: none !important;
-}
-
-.disabled[readonly] {
-    background-color: white !important;
-}
-
-input[disabled] {
-    background-color: white !important;
-    box-shadow: none !important;
-    border: none !important;
-}
-
 .container-fluid {
     padding-top: 115px !important;
 }
@@ -48,165 +33,6 @@ table > thead > tr > td > input {
     float: right;
 }
 
-.btn {
-    font-weight: 500;
-    line-height: 1;
-    text-transform: uppercase;
-    border: 3px solid transparent;
-    border-radius: 2px;
-}
-
-.navbar-inverse {
-    background-color: #BADA55;
-}
-
-.navbar-inverse .navbar-brand {
-    color: black;
-    text-transform: lowercase;
-}
-
-.navbar-inverse .navbar-nav>li>a {
-    color: black;
-    font-size: 15px;
-    font-weight: 500;
-    line-height: 1;
-    text-transform: uppercase;
-}
-
-.alert-warning {
-    background-color: #da5578;
-    color: white;
-}
-
-.alert-danger {
-    background-color: #b655da;
-    color: white;
-}
-
-.alert-success {
-    background-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-warning {
-    background-color: #da5578;
-    color: white;
-}
-
-.btn-toxic-danger {
-    background-color: #b655da;
-    color: white;
-}
-
-.btn-toxic-primary {
-    background-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-success {
-    background-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-lg {
-    font-size: 23px;
-    border-radius: 50% !important;
-    width: 75px;
-    height: 75px;
-    box-shadow: 2px 2px 13px black;
-}
-
-.btn-toxic-warning:hover {
-    background-color: #da5578;
-    filter: brightness(95%);
-    border-color: #da5578;
-    color: white;
-}
-
-.btn-toxic-danger:hover {
-    background-color: #b655da;
-    filter: brightness(95%);
-    border-color: #b655da;
-    color: white;
-}
-
-.btn-toxic-primary:hover {
-    background-color: #bada55;
-    filter: brightness(95%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-success:hover {
-    background-color: #bada55;
-    filter: brightness(95%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-warning:focus {
-    background-color: #da5578;
-    filter: brightness(90%);
-    border-color: #da5578;
-    color: white;
-}
-
-.btn-toxic-danger:focus {
-    background-color: #b655da;
-    filter: brightness(90%);
-    border-color: #b655da;
-    color: white;
-}
-
-.btn-toxic-primary:focus {
-    background-color: #bada55;
-    filter: brightness(90%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-success:focus {
-    background-color: #bada55;
-    filter: brightness(90%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-warning:active {
-    background-color: #da5578;
-    filter: brightness(90%);
-    border-color: #da5578;
-    color: white;
-}
-
-.btn-toxic-danger:active {
-    background-color: #b655da;
-    filter: brightness(90%);
-    border-color: #b655da;
-    color: white;
-}
-
-.btn-toxic-primary:active {
-    background-color: #bada55;
-    filter: brightness(90%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn-toxic-success:active {
-    background-color: #bada55;
-    filter: brightness(90%);
-    border-color: #bada55;
-    color: black;
-}
-
-.btn:active {
-    background-image: none;
-    outline: 0;
-    -webkit-box-shadow: none;
-    box-shadow: none;
-}
-
 .sidebar {
     position: fixed;
     left: 5px;
@@ -218,4 +44,13 @@ table > thead > tr > td > input {
 }
 .glyphicon.inactive {
     color: grey;
+}
+
+.btn-lg {
+    padding: 15px 16px 13px;
+    line-height: 15px;
+    font-size: 38px;
+    width: 90px;
+    height: 90px;
+    border-radius: 8px !important;
 }

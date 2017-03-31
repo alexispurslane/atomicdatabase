@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <title>Atomic Database by Raymond W. and Christopher D.</title>
-        <link rel="stylesheet" type="text/css" href="./css/bootstrap.min.css">
+        <link rel="stylesheet" type="text/css" href="https://bootswatch.com/simplex/bootstrap.min.css">
         <link rel="stylesheet" type="text/css" href="theme.css">
         <link rel="icon" href="./favicon.ico">
         <script src="./js/jquery-3.2.0.min.js"></script>
@@ -10,7 +10,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     </head>
     <body>
-        <nav class="navbar navbar-inverse navbar-fixed-top">
+        <nav class="navbar navbar-default navbar-fixed-top">
             <div class="navbar-header">
                 <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
                     <span class="sr-only">Toggle navigation</span>
@@ -28,12 +28,12 @@
                 <div class="input-group" style="width:100%">
                     <input type="text" class="query form-control" placeholder="Enter a query...">
                     <span class="input-group-btn">
-                        <button class="btn btn-toxic-success" id="solve" type="button"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></button>
+                        <button class="btn btn-success" id="solve" type="button"><span class="glyphicon glyphicon-search" aria-hidden="true"></span></button>
                     </span>
                 </div>
             </div>
         </nav>
-        <div id="status" style="padding: 5px; width:100%; position: fixed; top: 45px;">
+        <div id="status" style="padding: 5px; width:100%; position: fixed; top: 35px;">
             <div class="alert alert-success"></div>
         </div>
         <div class="container-fluid">
@@ -50,13 +50,13 @@
                         <tr id="values"></tr>
                     </tbody>
                 </table>
-                <button class="btn btn-toxic-primary" id="add-row">Add Row</button>
-                <button class="btn btn-toxic-danger"  id="del-row">Delete Row</button>
-                <button class="btn btn-toxic-primary" id="add-col">Add Column</button>
-                <button class="btn btn-toxic-danger"  id="del-col">Delete Column</button>
+                <button class="btn btn-success" id="add-row">Add Row</button>
+                <button class="btn btn-danger"  id="del-row">Delete Row</button>
+                <button class="btn btn-success" id="add-col">Add Column</button>
+                <button class="btn btn-danger"  id="del-col">Delete Column</button>
             </div>
             <div id="control" style="position: fixed; bottom: 0; right: 0;margin-right: 22px; margin-bottom: 20px; ">
-                <button class="btn btn-toxic-lg btn-toxic-warning pull-right" id="save" type="button">
+                <button class="btn btn-lg btn-warning pull-right" id="save" type="button">
                     <span class="glyphicon glyphicon-floppy-save" aria-hidden="true"></span>
                 </button>
             </div>

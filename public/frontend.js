@@ -1,6 +1,4 @@
 // TODO:
-// Tabbing goes to the next (and wraps around)
-// Enter = focusout
 // Reduce verbosity
 
 var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
@@ -163,7 +161,23 @@ $(document).ready(function () {
         });
     });
 
-    $(document.body).on('dblclick', ".disabled", function () {
+    var wastabbed = false;
+    $('.disabled').focusin(function () {
+        if (wastabbed) {
+            $(this).trigger("dblclick");
+        }
+        wastabbed = false;
+    });
+
+    $(".disabled").keydown(function (e) {
+        if (e.which === 9) {
+            wastabbed = true;
+        } else if (e.which === 13) {
+            $(this).trigger("focusout");
+        }
+    });
+
+    $('.disabled').dblclick(function () {
         $(this).removeClass("disabled");
         $(this).prop("readonly", false);
     });
