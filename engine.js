@@ -240,7 +240,7 @@ module.exports.addRule = (title, buf, flag) => {
             res.push(splitByConj(line));
         });
 
-        db.push(k.implies(...rules));
+        db.push(k.implies(...res));
     }
 
     module.exports.saveDatabase();

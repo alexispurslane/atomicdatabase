@@ -6,6 +6,7 @@
         <link rel="stylesheet" type="text/css" href="theme.css">
         <link rel="icon" href="./favicon.ico">
         <script src="./js/jquery-3.2.0.min.js"></script>
+        <script src="./js/bootstrap.min.js"></script>
         <script src="frontend.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     </head>
@@ -24,6 +25,7 @@
                 <li class="active"><a href="#">Facts</a></li>
                 <li><a href="rules.html">Rules</a></li>
             </ul>
+            <button type="button" class="btn btn-info navbar-btn" data-toggle="modal" data-target="#myModal">Enter/Generate PIN</button>
             <div class="navbar-form navbar-right" style="width:79%;">
                 <div class="input-group" style="width:100%">
                     <input type="text" class="query form-control" placeholder="Enter a query...">
@@ -37,6 +39,7 @@
             <div class="alert alert-success"></div>
         </div>
         <div class="container-fluid">
+            <h1  id="empty-message"style="text-align: center; color: grey;"><strong>Welcome! Just add some rows to get started.</strong></h1>
             <table class="table table-bordered table-hover">
                 <tbody id="tbl" class="facts"></tbody>
             </table>
@@ -59,6 +62,35 @@
                 <button class="btn btn-lg btn-warning pull-right" id="save" type="button">
                     <span class="glyphicon glyphicon-floppy-save" aria-hidden="true"></span>
                 </button>
+            </div>
+        </div>
+
+        <!-- Modal -->
+        <div id="myModal" class="modal fade" role="dialog">
+            <div class="modal-dialog">
+
+                <!-- Modal content-->
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Private Database PIN</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div id="has-pin">
+                            <p>Private Database PIN:</p>
+                            <input type="password" id="pin" class="form-control" placeholder="PIN"/>
+                        </div>
+
+                        <div class="checkbox">
+                            <label><input type="checkbox" value="nopin" onclick="$('#has-pin').fadeOut(800);">Generate a PIN</label>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="pin" class="btn btn-primary" data-dismiss="modal">OK</button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                    </div>
+                </div>
+
             </div>
         </div>
     </body>

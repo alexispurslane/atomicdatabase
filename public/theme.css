@@ -1,3 +1,7 @@
+.form-control[readonly] {
+    background: white !important;
+}
+
 .container-fluid {
     padding-top: 115px !important;
 }
@@ -48,9 +52,15 @@ table > thead > tr > td > input {
 
 .btn-lg {
     padding: 15px 16px 13px;
-    line-height: 15px;
-    font-size: 38px;
-    width: 90px;
-    height: 90px;
+    font-size: 30px;
+    width: 78px;
+    height: 78px;
     border-radius: 8px !important;
+}
+
+.panel-default {
+    border-color: #dddddd;
+    padding: 0px;
+    margin-left: 5px;
+    margin-top: -10px;
 }

@@ -6,7 +6,7 @@ function addRule(title, body) {
                     <span class="glyphicon glyphicon-check pull-right" id="'+title+'-toggle" aria-hidden="true"></span>\
                 </a>');
     }
-    $(".rules").append('<a name="'+title+'"></a><div id="'+title+'-panel" class="panel panel-default">\
+    $(".rules").append('<a name="'+title+'"></a><div id="'+title+'-panel" class="panel ol-lg-5 col-md-5 col-sm-5 panel-default">\
             <div class="rule panel-heading">\
                 <h3 class="panel-title"><input style="font-size: inherit;" value="'+title+'" type="text" class="form-control title"/></h3>\
             </div>\
@@ -24,6 +24,8 @@ function addRule(title, body) {
                 </button>\
             </div>\
         </div>');
+
+    $('#'+title+'-panel').hide().fadeIn(800);
 
     $('#'+title+'-toggle').click(function () {
         if ($(this).hasClass('glyphicon-unchecked')) {
@@ -102,7 +104,9 @@ $(document).ready(function () {
         });
     });
 
+    var n = 1;
     $("#new").click(function () {
-        addRule("", "");
+        addRule("untitled"+n, "");
+        n++;
     });
 });

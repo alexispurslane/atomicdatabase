@@ -1,7 +1,8 @@
 // TODO:
 // Reduce verbosity
+// Encrypt pin
 
-var input = "<input type=\"text\" readonly=\"true\" class=\"field form-control disabled\"></input>";
+var input = "<input type=\"text\" class=\"field form-control\"></input>";
 var fieldSlot = "<td> " + input + " </td>";
 var baseURI = window.location.protocol + "//" + window.location.host + "/";
 var tips = [
@@ -15,6 +16,16 @@ var tips = [
 var BreakException = {};
 
 $(document).ready(function () {
+    var s = "<thead class='facts'> <tr id=\"a\"> ";
+    for (var i = 0; i < 3; i++) {
+        s += "<td> <input type=\"text\" class=\"form-control\"></input> </td>";
+    }
+    s += "</tr> </thead>";
+    $("table").first().prepend(s);
+    $($("input").get(1)).prop("disabled", true);
+    $($("input").get(1)).prop("readonly", false);
+    $($("input").get(1)).val('Properties: ');
+
     var $status = $("#status");
     updateStatus(tips[Math.floor(Math.random()*tips.length)], false, true);
     function updateStatus(t, error, tip) {
@@ -36,23 +47,6 @@ $(document).ready(function () {
         }
     }
 
-    var s = "<thead class='facts'> <tr id=\"a\"> ";
-    for (var i = 0; i < 5; i++) {
-        s += "<td> <input type=\"text\" readonly=\"true\" class=\"form-control disabled\"></input> </td>";
-    }
-    s += "</tr> </thead>";
-    $("table").first().prepend(s);
-    $($("input").get(1)).prop("disabled", true);
-    $($("input").get(1)).prop("readonly", false);
-
-    s = "<tr> ";
-    for (var i = 0; i < 5; i++) {
-        s += fieldSlot;
-    }
-    s += "</tr>";
-    for (var i = 0; i < 4; i++)
-        $("tbody.facts").append(s);
-
     // On each reload: Load data
     var reloadRequest = {
         'type': 'reload'
@@ -63,7 +57,11 @@ $(document).ready(function () {
         var entityOrder = Object.entries(actualData.entityOrder);
 
         var database = actualData.database;
-        if (attrOrder.length === 0 || entityOrder.length === 0 || database.length === 0) return;
+        if (attrOrder.length === 0 || entityOrder.length === 0 || database.length === 0) {
+            return;
+        }
+
+        $("#empty-message").hide();
         var numColsToAdd = attrOrder.length - 4;
         if (numColsToAdd > 0)
             for (var i = 0; i < numColsToAdd; i++) {
@@ -73,7 +71,7 @@ $(document).ready(function () {
             for (var i = 0; i > numColsToAdd; i--) {
                 delColBypass();
             }
-        var numRowsToAdd = entityOrder.length - 4;
+        var numRowsToAdd = entityOrder.length;
         if (numRowsToAdd > 0)
             for (var i = 0; i < numRowsToAdd; i++) {
                 addRow();
@@ -130,8 +128,6 @@ $(document).ready(function () {
     });
 
     $(document.body).on('focusout', "input:not(.query)", function () {
-        $(this).addClass("disabled");
-        $(this).prop("readonly", true);
         if (!$(this).hasClass("field")) {
             return;
         }
@@ -157,32 +153,14 @@ $(document).ready(function () {
         $.post(baseURI, data, function(data) {
             if (!data.success) {
                 updateStatus(data.data, true);
+            } else {
+                updateStatus("Changes sent to server.");
             }
         });
     });
 
-    var wastabbed = false;
-    $('.disabled').focusin(function () {
-        if (wastabbed) {
-            $(this).trigger("dblclick");
-        }
-        wastabbed = false;
-    });
-
-    $(".disabled").keydown(function (e) {
-        if (e.which === 9) {
-            wastabbed = true;
-        } else if (e.which === 13) {
-            $(this).trigger("focusout");
-        }
-    });
-
-    $('.disabled').dblclick(function () {
-        $(this).removeClass("disabled");
-        $(this).prop("readonly", false);
-    });
-
     var addRow = function () {
+        $("#empty-message").hide();
         var cols = $("td").length / $(".facts > tr").length;
 
         var str = "<tr> ";
@@ -242,6 +220,7 @@ $(document).ready(function () {
     $("#del-row").click(delRow);
 
     var addCol = function () {
+        $("#empty-message").hide();
         $(".facts > tr").append(fieldSlot);
         updateStatus("Column added.");
     }
@@ -335,7 +314,30 @@ $(document).ready(function () {
             if (data.success) {
                 updateStatus("Database saved.");
             } else {
-                updateStatus("No database specified to be saved to.", true);
+                updateStatus("No database specified to be saved to. Try entering a PIN.", true);
+            }
+        });
+    });
+
+    $("#pin").click(function () {
+        var haspin = !$("#nopin").prop("checked");
+        if (haspin) console.log("Sending pin to server.");
+        else console.log("Asking server to setup new pin.");
+
+        var data = {
+            type: 'pin',
+            text: $("#pin").val(),
+            haspin: haspin
+        };
+
+        $.post(data, function (data) {
+            console.log(data);
+            if (data.data === null && data.success) {
+                updateStatus("Okay, you're all signed in!");
+            } else if (data.data !== null && data.success) {
+                updateStatus("Okay your pin is: " + data.data + ". This is private, so only show it to people who you want to have acess to this database.", false, true);
+            } else {
+                updateStatus("Something unforseen happened and we were unable to give you a pin. Please run around screaming now.");
             }
         });
     });

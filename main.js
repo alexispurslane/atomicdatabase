@@ -137,6 +137,56 @@ app.post('/', (req, res) => {
             }
         },
 
+        'pin': (data) => {
+            if (data.haspin) {
+                console.log("Internalizing new pin from user");
+                try {
+                    console.log("Loading pin's database");
+                    engine.loadDatabase(data.text);
+                } catch (e) {
+                    console.log("Pin database not found, assuming no such pin");
+                    res.send({
+                        success: false,
+                        data: "No such pin."
+                    })
+                }
+
+                console.log("pin database loaded");
+                res.send({
+                    data: null,
+                    success: true
+                });
+            } else {
+                console.log("Creating new pin for user");
+                var val = -1;
+                var pad = "0000"
+                var ans = pad.substring(0, pad.length - val.length) + val;
+
+                var found = false;
+                var items = fs.readdirSync(process.cwd());
+                do {
+                    val++;
+                    pad = "0000"
+                    ans = pad.substring(0, pad.length - val.length) + val;
+
+                    if (ans in items) {
+                        console.log("Pin " + ans + " already used, progressing.");
+                        found = true;
+                    }
+                } while (found);
+
+                console.log("Pin "+ ans +" unused, creating file!");
+                fs.closeSync(fs.openSync(ans, 'w'));
+
+                console.log("Saving current table to database.");
+                engine.saveDatabase(ans);
+                res.send({
+                    success: true,
+                    data: ans
+                });
+            }
+        },
+
         'rule': (data) => {
             const results = engine.addRule(data.title, data.text, data.flag);
             const successful = engine.isUnderstood(results);
