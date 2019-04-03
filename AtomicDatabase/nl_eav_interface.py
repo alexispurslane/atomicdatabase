@@ -42,6 +42,7 @@ def get_classifier():
         return classifier
 
 def sentence_act_features(word_tokens):
+    print(word_tokens)
     features = {}
     for word in word_tokens:
         features['contains({})'.format(word.lower())] = True
@@ -59,7 +60,6 @@ def ie_preprocess_sent(stop_words, string):
     punc = None
 
     sent = nltk.word_tokenize(string)
-    reverse = "of" in sent
     sent = [w for w in sent if not w in stop_words]
 
     sent = nltk.pos_tag(sent)
@@ -84,12 +84,14 @@ def ie_preprocess_sent(stop_words, string):
             quot_sent.append((x, tag))
 
     features = sentence_act_features([sanitize_quots(w) for w in quot_sent])
+    print(features)
 
     if reverse:
         if punc:
             quot_sent = quot_sent[:-1]
         quot_sent.reverse()
-        quot_sent.append(punc)
+        if punc:
+            quot_sent.append(punc)
 
     return quot_sent, features
 
@@ -101,7 +103,7 @@ def ie_process_eav(words):
     attribute = None
     value = None
     for (word, tag) in words:
-        if not entity and (tag == "QQ" or tag == "NNP" or tag == "NN"):
+        if not entity and (tag == "QQ" or tag == "NNP" or tag == "NN" or tag == "JJ"):
             entity = word
         elif not attribute and ("NN" in tag):
             attribute = word
@@ -114,6 +116,35 @@ def ie_process_eav(words):
         pass
     return (entity.replace(" ", ""), attribute, value)
 
+def ie_process_predicate(words):
+    entity = None
+    attribute = None
+    value = None
+    for (word, tag) in words:
+        if not entity and (tag == "QQ" or tag == "NNP" or tag == "NN" or tag == "JJ" or tag == "VBD"):
+            word = word.replace(" ", "")
+            if "NN" in tag and word[0].isupper():
+                entity = (eav_database.VARIABLE, word)
+            else:
+                entity = (eav_database.LITERAL, word)
+        elif not attribute and ("NN" in tag):
+            if word[0].isupper():
+                attribute = (eav_database.VARIABLE, word)
+            else:
+                attribute = (eav_database.LITERAL, word)
+        elif not value and attribute and entity:
+            if "NN" in tag and word[0].isupper():
+                value = (eav_database.VARIABLE, word)
+            else:
+                value = (eav_database.LITERAL, word)
+
+    if value[0] == eav_database.LITERAL:
+        try:
+            value = (value[0], float(value[1]))
+        except ValueError:
+            pass
+    return [entity, attribute, value]
+
 RULE = 1
 NEW_DATA = 2
 UNKNOWN = 3
@@ -121,6 +152,6 @@ def ie_convert_dispatch(words, stype):
     if stype == "Clarify" or "Answer" in stype or stype == "Statement":
         return NEW_DATA, ie_process_eav(words)
     elif "Question" in stype:
-        return RULE, ie_process_rule(words)
+        return RULE, ie_process_predicate(words)
     else:
         return UNKNOWN, None
