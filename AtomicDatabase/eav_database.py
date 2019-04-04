@@ -81,20 +81,22 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
 def get_variable_names(lst):
     return [name  if tpe == VARIABLE else None for (tpe, name) in lst]
 
-def cleanse(lst, binds, subs):
+def cleanse(unsafe_tail, binds, subs):
+    tail = []
     print(str(subs))
     for el in unsafe_tail:
         if el[0] == VARIABLE and el[1] in subs and subs[el[1]] != None:
             print("SUBS: " + str(el[1]) + " = " + str(subs[el[1]]))
             tail.append((el[0], subs[el[1]]))
         elif type(el) == list:
-            tail.append(cleanse(el, binds, subs))
+            tail.append([el[0]] + cleanse(el[1:], binds, subs))
         else:
             tail.append(el)
+    return tail
 
 def evaluate_rule(db, rule, binds={}, subs={}):
     head, *tail = rule
-    tail = cleanse(tail)
+    tail = cleanse(tail, binds, subs)
     print(head, tail)
     if head == PREDICATE:
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
