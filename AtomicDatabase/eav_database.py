@@ -18,7 +18,8 @@ def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
 
 def eval_expr(val, binds):
-    return eval(" ".join([binds[el] if el in binds else el for el in val]), {}, {})
+    print(val)
+    return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def unify(a, b, binds={}):
     for i in range(0, min(len(a), len(b))):
@@ -117,11 +118,11 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                             (LITERAL, db.attributes[a]),
                             (LITERAL, v)]
                 res = unify(tail, eav_rule, copy.copy(binds))
-                if res:
+                if res != None:
                     yield res
     elif head == UNIFY:
         res = unify(tail[0], tail[1], copy.copy(binds))
-        if res:
+        if res != None:
             yield res
     elif head == CONJ_OR:
         for tail_x in tail:
@@ -148,12 +149,22 @@ def create_rule(lst):
             rule.append(create_rule(r))
     elif lst[0] == "unify":
         rule.append(UNIFY)
-        rule.append(create_rule(lst[1]))
-        rule.append(create_rule(lst[2]))
+        rule.append(create_rule(lst[1])[1:])
+        rule.append(create_rule(lst[2])[1:])
     else:
         rule.append(PREDICATE)
+        in_expr = False
+        expr = []
         for e in lst:
-            if e[0].isupper():
+            if e == "expr":
+                in_expr = not in_expr
+                if in_expr:
+                    expr = []
+                else:
+                    rule.append((EXPR, expr))
+            elif in_expr:
+                expr.append(e)
+            elif type(e) == str and e[0].isupper():
                 rule.append((VARIABLE, e))
             else:
                 rule.append((LITERAL, e))
