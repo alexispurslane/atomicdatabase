@@ -1,30 +1,35 @@
 from collections import namedtuple
 from enum import Enum
 from itertools import chain
+from sexpdata import loads, dumps, Symbol
 import copy
 
 VARIABLE   = 1
 EXPR       = 2
 LITERAL    = 3
+RULE       = 4
 
 CONJ_OR    = 1
 CONJ_AND   = 2
 PREDICATE  = 3
+UNIFY      = 4
 
 def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
+
+def eval_expr(val, binds):
+    return eval(" ".join([binds[el] if el in binds else el for el in val]), {}, {})
 
 def unify(a, b, binds={}):
     for i in range(0, min(len(a), len(b))):
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
-
         if a_type == EXPR:
-            a_val = eval(a_val)
             a_type = LITERAL
+            a_val = eval_expr(a_val, binds)
         if b_type == EXPR:
-            b_val = eval(b_val)
             b_type = LITERAL
+            b_val = eval_expr(b_val, binds)
 
         if a_type == LITERAL and b_type == LITERAL:
             if a_val == b_val:
@@ -64,33 +69,100 @@ def peek(iterable):
         return None
     return chain([first], iterable)
 
-def evaluate_rule(db, rule, binds={}):
+def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
+    if and_clauses == []:
+        yield binds
+    else:
+        head, *tail = and_clauses
+        possible = evaluate_rule(db, head, binds, subs)
+        for p in possible:
+            yield from evaluate_and_rule(db, tail, p, subs)
+
+def get_variable_names(lst):
+    return [name  if tpe == VARIABLE else None for (tpe, name) in lst]
+
+def cleanse(lst, binds, subs):
+    print(str(subs))
+    for el in unsafe_tail:
+        if el[0] == VARIABLE and el[1] in subs and subs[el[1]] != None:
+            print("SUBS: " + str(el[1]) + " = " + str(subs[el[1]]))
+            tail.append((el[0], subs[el[1]]))
+        elif type(el) == list:
+            tail.append(cleanse(el, binds, subs))
+        else:
+            tail.append(el)
+
+def evaluate_rule(db, rule, binds={}, subs={}):
     head, *tail = rule
+    tail = cleanse(tail)
+    print(head, tail)
     if head == PREDICATE:
-        for (e, a, v) in db.eavs.values():
-            eav_rule = [(LITERAL, db.entities[e]),
-                        (LITERAL, db.attributes[a]),
-                        (LITERAL, v)]
-            res = unify(tail, eav_rule, copy.copy(binds))
-            if res:
-                yield res
+        if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
+            rule = db.rules[tail[1][1]]
+            var_names = get_variable_names(tail)
+            params = var_names[:1] + var_names[2:]
+            substitutions = dict(zip(rule["args"], params))
+
+            print("CALL RULE:\t" + tail[1][1])
+            print("PARAMS:\t" + str(params))
+            print("ARGS:\t" + str(rule["args"]))
+
+            for res in evaluate_rule(db, rule["body"], binds, subs=substitutions):
+                yield { substitutions[k]: res[substitutions[k]] for k in rule["args"] if substitutions[k] }
+        else:
+            for (e, a, v) in db.eavs.values():
+                eav_rule = [(LITERAL, db.entities[e]),
+                            (LITERAL, db.attributes[a]),
+                            (LITERAL, v)]
+                res = unify(tail, eav_rule, copy.copy(binds))
+                if res:
+                    yield res
+    elif head == UNIFY:
+        res = unify(tail[0], tail[1], copy.copy(binds))
+        if res:
+            yield res
     elif head == CONJ_OR:
-        [tail_a, tail_b] = tail
-        res_a = evaluate_rule(db, tail_a, copy.copy(binds))
-        res_b = evaluate_rule(db, tail_b, copy.copy(binds))
-        yield from chain(res_a, res_b)
+        for tail_x in tail:
+            yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
     elif head == CONJ_AND:
-        [tail_a, tail_b] = tail
-        res_a = evaluate_rule(db, tail_a, copy.copy(binds))
-        for possible_binds in res_a:
-            res_b = evaluate_rule(db, tail_b, copy.copy(possible_binds or {}))
-            yield from res_b
+        yield from evaluate_and_rule(db, tail, binds, subs)
+
+def clean_symbol(e):
+    if isinstance(e, Symbol):
+        return e._val
+    else:
+        return e
+
+def create_rule(lst):
+    rule = []
+    lst = [clean_symbol(sym) for sym in lst]
+    if lst[0] == "&":
+        rule.append(CONJ_AND)
+        for r in lst[1:]:
+            rule.append(create_rule(r))
+    elif lst[0] == "|":
+        rule.append(CONJ_OR)
+        for r in lst[1:]:
+            rule.append(create_rule(r))
+    elif lst[0] == "unify":
+        rule.append(UNIFY)
+        rule.append(create_rule(lst[1]))
+        rule.append(create_rule(lst[2]))
+    else:
+        rule.append(PREDICATE)
+        for e in lst:
+            if e[0].isupper():
+                rule.append((VARIABLE, e))
+            else:
+                rule.append((LITERAL, e))
+    return rule
 
 class EAVDatabase:
     def __init__(self):
         self.attributes = []
         self.entities = []
         self.eavs = {}
+        self.rules = {}
 
     def get_or_add_entity_id(self, entity):
         forein_entity = -1
@@ -158,30 +230,44 @@ class EAVDatabase:
 
         return data
 
+    def add_rule(self, name, args, body):
+        self.rules[name] = {
+            "name": name,
+            "args": args,
+            "body": create_rule(loads("(& " + body + ")"))
+        }
+        return self
+
     def load_examples(self):
-        self.add(("cool@gmail.com", "name", "Joe Cool"))
-        self.add(("cool@gmail.com", "father", "pa_cool@gmail.com"))
-        self.add(("cool@gmail.com", "mother", "mam_cool@gmail.com"))
+        (
+            self.add(("cool@gmail.com", "name", "Joe Cool"))
+            .add(("cool@gmail.com", "father", "pa_cool@gmail.com"))
+            .add(("cool@gmail.com", "mother", "mam_cool@gmail.com"))
 
-        self.add(("stop@gmail.com", "name", "No-Stop Cool"))
-        self.add(("stop@gmail.com", "father", "pa_cool@gmail.com"))
-        self.add(("stop@gmail.com", "mother", "mammam_cool@gmail.com"))
+            .add(("stop@gmail.com", "name", "No-Stop Cool"))
+            .add(("stop@gmail.com", "father", "pa_cool@gmail.com"))
+            .add(("stop@gmail.com", "mother", "mammam_cool@gmail.com"))
 
-        self.add(("pa_cool@gmail.com", "name", "Kent Cool"))
-        self.add(("pa_cool@gmail.com", "father", "papa_cool@gmail.com"))
-        self.add(("pa_cool@gmail.com", "mother", "mampa_cool@gmail.com"))
+            .add(("pa_cool@gmail.com", "name", "Kent Cool"))
+            .add(("pa_cool@gmail.com", "father", "papa_cool@gmail.com"))
+            .add(("pa_cool@gmail.com", "mother", "mampa_cool@gmail.com"))
 
-        self.add(("mam_cool@gmail.com", "name", "Ruby Cool"))
-        self.add(("mam_cool@gmail.com", "father", "pamam_cool@gmail.com"))
-        self.add(("mam_cool@gmail.com", "mother", "mammam_cool@gmail.com"))
+            .add(("mam_cool@gmail.com", "name", "Ruby Cool"))
+            .add(("mam_cool@gmail.com", "father", "pamam_cool@gmail.com"))
+            .add(("mam_cool@gmail.com", "mother", "mammam_cool@gmail.com"))
 
-        self.add(("papa_cool@gmail.com", "name", "John Cool"))
+            .add(("papa_cool@gmail.com", "name", "John Cool"))
 
-        self.add(("mampa_cool@gmail.com", "name", "Rose Cool"))
+            .add(("mampa_cool@gmail.com", "name", "Rose Cool"))
 
-        self.add(("pamam_cool@gmail.com", "name", "Ed Cool"))
+            .add(("pamam_cool@gmail.com", "name", "Ed Cool"))
 
-        self.add(("mammam_cool@gmail.com", "name", "Julie Cool"))
+            .add(("mammam_cool@gmail.com", "name", "Julie Cool"))
+            .add_rule("grandfather", ["Person", "Goal"], """
+            (Person father X)
+            (X father Goal)
+            """)
+        )
 
 
 
