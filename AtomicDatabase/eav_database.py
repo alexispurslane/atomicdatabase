@@ -18,7 +18,6 @@ def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
 
 def eval_expr(val, binds):
-    print(val)
     return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def unify(a, b, binds={}):

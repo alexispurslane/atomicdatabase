@@ -1,157 +1,88 @@
 import eav_database
 
-import nltk
-import pickle
-from nltk.corpus import stopwords
-from nltk.stem import LancasterStemmer
-from nltk import word_tokenize, pos_tag, ne_chunk
-from nltk.chunk import conlltags2tree, tree2conlltags
-nltk.download('nps_chat')
+import spacy
+from spacy.matcher import Matcher
 
-CLASSIFIER_FILE_LOC = "naivebayes.pickle"
+import re
 
-def make_utility_objects():
-    stop_words = set(stopwords.words('english'))
-    stemmer = LancasterStemmer()
-    return stop_words, stemmer
+PATTERNS = {
+    "ReversePredicate": [
+        {'DEP': 'nsubj'},
+        {'LEMMA': 'be'},
+        {'POS': 'DET', 'OP': '*'},
+        {'POS': 'NOUN'},
+        {'DEP': 'prep'},
+        {'DEP': 'pobj'},
+    ],
+    "Predicate": [
+        {'POS': 'NOUN'},
+        {'POS': 'PART', 'OP': '?'},
+        {'DEP': 'nsubj'},
+        {'LEMMA': 'be'},
+        {'DEP': 'attr'},
+    ],
+    "SimpleQuery": [
+        {'TAG': 'WP'},
+        {'LEMMA': 'be'},
+        {'IS_ASCII': True, 'POS': 'X'},
+        {'POS': 'PART', 'OP': '?'},
+        {'DEP': 'attr'},
+    ]
+}
 
-def get_classifier():
-    try:
-        print('Loading classifier from file...')
+def create_matcher(nlp):
+    matcher = Matcher(nlp.vocab)
 
-        classifier_f = open(CLASSIFIER_FILE_LOC, "rb")
-        classifier = pickle.load(classifier_f)
-        classifier_f.close()
+    for (k, v) in PATTERNS.items():
+        print("Added " + k + " pattern.")
+        matcher.add(k, None, v)
 
-        return classifier
-    except:
-        print('No file found. Training new classifier...')
-        posts = nltk.corpus.nps_chat.xml_posts()[:10000]
-        featuresets = [(sentence_act_features(nltk.word_tokenize(post.text)), post.get('class')) for post in posts]
-        size = int(len(featuresets) * 0.1)
-        train_set, test_set = featuresets[size:], featuresets[:size]
-        classifier = nltk.NaiveBayesClassifier.train(train_set)
+    return matcher
 
-        print('Trained Sentence Classifier: ' + str(nltk.classify.accuracy(classifier, test_set)))
-        classifier.show_most_informative_features(5)
-
-        save_classifier = open(CLASSIFIER_FILE_LOC, "wb+")
-        pickle.dump(classifier, save_classifier)
-        save_classifier.close()
-
-        return classifier
-
-def sentence_act_features(word_tokens):
-    print(word_tokens)
-    features = {}
-    for word in word_tokens:
-        features['contains({})'.format(word.lower())] = True
-    return features
-
-def sanitize_quots(w):
-    (word, tag) = w
-    if tag == "QQ":
-        return "something"
-    else:
-        return word
-
-def ie_preprocess_sent(stop_words, string):
-    reverse = False
-    punc = None
-
-    sent = nltk.word_tokenize(string)
-    sent = [w for w in sent if not w in stop_words]
-
-    sent = nltk.pos_tag(sent)
-
-    if sent[-1][1] == ".":
-        punc = sent[-1]
-
-    quot_sent = []
+def create_text_entities(string):
+    new_str = ""
     in_quot = False
-    for (x, tag) in sent:
-        if tag == "``":
-            in_quot = True
-            quot_sent.append(("", "QQ"))
-        elif tag == "''":
-            in_quot = False
-        elif in_quot and quot_sent[-1][1] == "QQ":
-            leading = ""
-            if len(quot_sent[-1][0]) > 0:
-                leading = quot_sent[-1][0] + " "
-            quot_sent[-1] = (leading + x, "QQ")
-        elif tag != "``" and tag != "''" and not in_quot:
-            quot_sent.append((x, tag))
-
-    features = sentence_act_features([sanitize_quots(w) for w in quot_sent])
-    print(features)
-
-    if reverse:
-        if punc:
-            quot_sent = quot_sent[:-1]
-        quot_sent.reverse()
-        if punc:
-            quot_sent.append(punc)
-
-    return quot_sent, features
-
-def ie_process_tok(classifier, tagged, features):
-    return [(word, c) for (word, c) in tagged if c != '.'], classifier.classify(features)
-
-def ie_process_eav(words):
-    entity = None
-    attribute = None
-    value = None
-    for (word, tag) in words:
-        if not entity and (tag == "QQ" or tag == "NNP" or tag == "NN" or tag == "JJ"):
-            entity = word
-        elif not attribute and ("NN" in tag):
-            attribute = word
-        elif not value and attribute and entity:
-            value = word
-
-    try:
-        value = float(value)
-    except ValueError:
-        pass
-    return (entity.replace(" ", ""), attribute, value)
-
-def ie_process_predicate(words):
-    entity = None
-    attribute = None
-    value = None
-    for (word, tag) in words:
-        if not entity and (tag == "QQ" or tag == "NNP" or tag == "NN" or tag == "JJ" or tag == "VBD"):
-            word = word.replace(" ", "")
-            if "NN" in tag and word[0].isupper():
-                entity = (eav_database.VARIABLE, word)
+    entities = []
+    for c in string:
+        if c == "\"":
+            in_quot = not in_quot
+            if in_quot:
+                entities.append("")
             else:
-                entity = (eav_database.LITERAL, word)
-        elif not attribute and ("NN" in tag):
-            if word[0].isupper():
-                attribute = (eav_database.VARIABLE, word)
+                new_str += "ENTITY_" + str(len(entities) - 1)
+        else:
+            if in_quot:
+                entities[-1] += c
             else:
-                attribute = (eav_database.LITERAL, word)
-        elif not value and attribute and entity:
-            if "NN" in tag and word[0].isupper():
-                value = (eav_database.VARIABLE, word)
-            else:
-                value = (eav_database.LITERAL, word)
+                new_str += c
+    return new_str, entities
 
-    if value[0] == eav_database.LITERAL:
-        try:
-            value = (value[0], float(value[1]))
-        except ValueError:
-            pass
-    return [entity, attribute, value]
+def get_matches(matches, doc):
+    return [(nlp.vocab.strings[match_id], doc[start:end]) for match_id, start, end in matches]
 
-RULE = 1
-NEW_DATA = 2
-UNKNOWN = 3
-def ie_convert_dispatch(words, stype):
-    if stype == "Clarify" or "Answer" in stype or stype == "Statement":
-        return NEW_DATA, ie_process_eav(words)
-    elif "Question" in stype:
-        return RULE, ie_process_predicate(words)
-    else:
-        return UNKNOWN, None
+def group_conjs(strings):
+    collections = [['and']]
+    current_conj = 'and'
+    for s in strings:
+        s_s = s.strip()
+        print("CONJ: " + str(current_conj))
+        print("STR: " + s)
+        if s_s == 'and' or s_s == 'or':
+            if current_conj != s_s:
+                collections.append([s_s])
+                current_conj = s_s
+        else:
+            collections[-1].append(s_s)
+    return collections
+
+def understand_predicate(matcher, string):
+    string, entities = create_text_entities(string)
+    conjugation_groups = group_conjs(re.split(" (and|or) ", string))
+
+    new_groups = []
+    for group in conjugation_groups:
+        new_groups.append([group[0]])
+        for line in group[1:]:
+            doc = nlp(line)
+            new_groups[-1].append(get_matches(matcher(doc), doc))
+    return new_groups, entities
