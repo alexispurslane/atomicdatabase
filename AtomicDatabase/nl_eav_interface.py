@@ -24,9 +24,9 @@ PATTERNS = {
     "SimpleQuery": [
         {'TAG': 'WP'},
         {'LEMMA': 'be'},
-        {'IS_ASCII': True, 'POS': 'X'},
+        {'DEP': 'poss'},
         {'POS': 'PART', 'OP': '?'},
-        {'DEP': 'attr'},
+        {'IS_ASCII': True, 'IS_SPACE': False}
     ]
 }
 
@@ -124,7 +124,7 @@ def recursive_map(constarg, fun, lst):
         else:
             mat = fun(constarg, item)
             if len(mat) > 0:
-                res.append(mat)
+                res.append(mat[-1])
             else:
                 res.append(item)
     return res
