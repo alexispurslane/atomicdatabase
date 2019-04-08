@@ -52,12 +52,12 @@ My plan looks like this at the moment:
       another library like I did for Atomic Database 1.0 because this database
       has some very specific needs, and for AD1 that led to some very hacky,
       unstable code. Plus, implementing my own is fun!
-- [X] Implement a Natural Language layer to interface with both the database or
+- [ ] Implement a Natural Language layer to interface with both the database or
       the logic language depending on what type of request is fed to it. This is
       going to be difficult to do reliably, so...
-- [ ] Make a simple S-expression language to interface more reliably and
+- [X] Make a simple S-expression language to interface more reliably and
       powerfully with the database. Call it a Pro-mode or something.
-- [ ] Implement a way to reference and store "rules" about the data relations in
+- [X] Implement a way to reference and store "rules" about the data relations in
       the database. This is a hugely important one.
 - [ ] Implement a UI in Kivy. This can be simple: a list of text boxes on one
       side, each with an editable title and a "new" button below them for rules,
