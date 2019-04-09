@@ -13,6 +13,7 @@ CONJ_OR    = 1
 CONJ_AND   = 2
 PREDICATE  = 3
 UNIFY      = 4
+PROP_GET   = 5
 
 def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
@@ -123,6 +124,12 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         res = unify(tail[0], tail[1], copy.copy(binds))
         if res != None:
             yield res
+    elif head == PROP_GET:
+        [ent, att, out] = tail
+        if out[0][0] == VARIABLE and out[1][0].isupper():
+            new_binds = copy.copy(binds)
+            new_binds[out[1]] = db.get_value(ent[1], att[1])
+            yield binds
     elif head == CONJ_OR:
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
@@ -146,6 +153,11 @@ def create_rule(lst):
         rule.append(CONJ_OR)
         for r in lst[1:]:
             rule.append(create_rule(r))
+    elif lst[0] == "get":
+        rule.append(PROP_GET)
+        rule.append(lst[1])
+        rule.append(lst[2])
+        rule.append(lst[3])
     elif lst[0] == "unify":
         rule.append(UNIFY)
         rule.append(create_rule(lst[1])[1:])

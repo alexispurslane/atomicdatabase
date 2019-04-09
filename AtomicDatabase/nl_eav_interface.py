@@ -10,16 +10,24 @@ PATTERNS = {
         {'DEP': 'nsubj'},
         {'LEMMA': 'be'},
         {'POS': 'DET', 'OP': '*'},
-        {'POS': 'NOUN'},
+        {'DEP': 'attr'},
         {'DEP': 'prep'},
         {'DEP': 'pobj'},
     ],
-    "Predicate": [
+    "PredicateContraction": [
         {'POS': {'IN': ['NOUN', 'PROPN']}},
         {'POS': 'PART', 'OP': '?'},
         {'DEP': 'nsubj'},
         {'LEMMA': 'be'},
         {'DEP': 'attr'}
+    ],
+    "Predicate": [
+        {'POS': 'DET', 'OP': '*'},
+        {'DEP': 'nsubj'},
+        {'DEP': 'prep'},
+        {'DEP': 'pobj'},
+        {'LEMMA': 'be'},
+        {'DEP': 'attr'},
     ],
     "SimpleQuery": [
         {'TAG': 'WP'},
@@ -122,17 +130,17 @@ def recursive_map(constarg, fun, lst):
         if isinstance(item, list):
             res.append(recursive_map(constarg, fun, item))
         else:
-            mat = fun(constarg, item)
-            if len(mat) > 0:
-                res.append(mat[-1])
-            else:
-                res.append(item)
+            res.append(fun(constarg, item))
     return res
 
 def run_nlp(constarg, string):
     (matcher, nlp) = constarg
     doc = nlp(string)
-    return get_matches(matcher(doc), doc)
+    mat = get_matches(matcher(doc), doc)
+    if len(mat) > 0:
+        return mat[-1]
+    else:
+        return string
 
 def understand_predicate(nlp, matcher, string):
     string, entities = create_text_entities(string)
@@ -140,6 +148,65 @@ def understand_predicate(nlp, matcher, string):
 
     # No multiline lambdas means no closures, so i have to implement them manually
     return recursive_map((matcher, nlp), run_nlp, conjugation_groups), entities
+
+RULE_IDS = {
+    '&': eav_database.CONJ_AND,
+    '|': eav_database.CONJ_OR,
+}
+
+def create_type(s, entities):
+    if "ENTITY_" in s:
+        rematch = re.search("([0-9]+)", s)
+        if rematch:
+            print(entities)
+            number = int(rematch.group())
+            return (eav_database.LITERAL, entities[number])
+        else:
+            return (eav_database.LITERAL, s)
+    elif s[0].isupper():
+        return (eav_database.VARIABLE, s.replace(".", ""))
+    else:
+        return (eav_database.LITERAL, s)
+
+def convert_match_to_rule(entities, match):
+    global RULE_IDS
+    if isinstance(match, tuple):
+        (pattern, lst) = match
+        (entity, attribute, value) = (None, None, None)
+        if pattern == 'SimpleQuery':
+            entity = [x.text for x in lst if x.dep_ == 'poss']
+            attribute = [x.text for x in lst if x.pos_ != 'PUNCT'][-1]
+            return [eav_database.PROP_GET,
+                    (eav_database.LITERAL, entity),
+                    (eav_database.LITERAL, attribute),
+                    (eav_database.VARIABLE, 'Result')]
+        elif pattern == 'PredicateContraction':
+            entity    = [x.text for x in lst if x.pos_ in ['NOUN', 'PROPN']]
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
+            value     = [x.text for x in lst if x.dep_ == 'attr']
+        elif pattern == 'ReversePredicate':
+            entity    = [x.text for x in lst if x.dep_ == 'pobj']
+            attribute = [x.text for x in lst if x.dep_ == 'attr']
+            value     = [x.text for x in lst if x.dep_ == 'nsubj']
+        elif pattern == 'Predicate':
+            entity    = [x.text for x in lst if x.dep_ == 'pobj']
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
+            value     = [x.text for x in lst if x.dep_ == 'attr']
+
+        if entity != None and attribute != None and value != None:
+            args = [entity, attribute, value]
+            return [eav_database.PREDICATE, *[create_type(x[0], entities) for x in args]]
+    elif isinstance(match, str) and match in RULE_IDS:
+        return RULE_IDS[match]
+    else:
+        return match
+
+def convert_nlast_to_rules(ast, entities):
+    res = recursive_map(entities, convert_match_to_rule, ast)
+    if len(res) == 1:
+        return res[0]
+    else:
+        return res
 
 def pos_printer(doc):
     columns = ["TEXT", "LEMMA", "POS", "TAG", "DEP"]
