@@ -175,10 +175,10 @@ def convert_match_to_rule(entities, match):
         (entity, attribute, value) = (None, None, None)
         if pattern == 'SimpleQuery':
             entity = [x.text for x in lst if x.dep_ == 'poss']
-            attribute = [x.text for x in lst if x.pos_ != 'PUNCT'][-1]
-            return [eav_database.PROP_GET,
-                    (eav_database.LITERAL, entity),
-                    (eav_database.LITERAL, attribute),
+            attribute = [x.text for x in lst if x.pos_ != 'PUNCT']
+            return [eav_database.PREDICATE,
+                    create_type(entity[0], entities),
+                    create_type(attribute[-1], entities),
                     (eav_database.VARIABLE, 'Result')]
         elif pattern == 'PredicateContraction':
             entity    = [x.text for x in lst if x.pos_ in ['NOUN', 'PROPN']]

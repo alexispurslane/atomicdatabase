@@ -13,7 +13,6 @@ CONJ_OR    = 1
 CONJ_AND   = 2
 PREDICATE  = 3
 UNIFY      = 4
-PROP_GET   = 5
 
 def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
@@ -112,6 +111,12 @@ def evaluate_rule(db, rule, binds={}, subs={}):
 
             for res in evaluate_rule(db, rule["body"], binds, subs=substitutions):
                 yield { substitutions[k]: res[substitutions[k]] for k in rule["args"] if substitutions[k] }
+        elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
+            res = db.get_value(tail[0][1], tail[1][1])
+            if res:
+                new_binds = copy.copy(binds)
+                new_binds[tail[2][1]] = res
+                yield new_binds
         else:
             for (e, a, v) in db.eavs.values():
                 eav_rule = [(LITERAL, db.entities[e]),
@@ -124,12 +129,6 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         res = unify(tail[0], tail[1], copy.copy(binds))
         if res != None:
             yield res
-    elif head == PROP_GET:
-        [ent, att, out] = tail
-        if out[0][0] == VARIABLE and out[1][0].isupper():
-            new_binds = copy.copy(binds)
-            new_binds[out[1]] = db.get_value(ent[1], att[1])
-            yield binds
     elif head == CONJ_OR:
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
@@ -153,11 +152,6 @@ def create_rule(lst):
         rule.append(CONJ_OR)
         for r in lst[1:]:
             rule.append(create_rule(r))
-    elif lst[0] == "get":
-        rule.append(PROP_GET)
-        rule.append(lst[1])
-        rule.append(lst[2])
-        rule.append(lst[3])
     elif lst[0] == "unify":
         rule.append(UNIFY)
         rule.append(create_rule(lst[1])[1:])
@@ -180,6 +174,9 @@ def create_rule(lst):
             else:
                 rule.append((LITERAL, e))
     return rule
+
+def body(st):
+    return create_rule(loads("(& " + body + ")"))
 
 class EAVDatabase:
     def __init__(self):
@@ -254,11 +251,11 @@ class EAVDatabase:
 
         return data
 
-    def add_rule(self, name, args, body):
+    def add_rule(self, name, args, rule):
         self.rules[name] = {
             "name": name,
             "args": args,
-            "body": create_rule(loads("(& " + body + ")"))
+            "body": rule
         }
         return self
 
@@ -287,10 +284,10 @@ class EAVDatabase:
             .add(("pamam_cool@gmail.com", "name", "Ed Cool"))
 
             .add(("mammam_cool@gmail.com", "name", "Julie Cool"))
-            .add_rule("grandfather", ["Person", "Goal"], """
+            .add_rule("grandfather", ["Person", "Goal"], body("""
             (Person father X)
             (X father Goal)
-            """)
+            """))
         )
 
 
