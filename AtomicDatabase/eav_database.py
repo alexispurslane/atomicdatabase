@@ -3,6 +3,7 @@ from enum import Enum
 from itertools import chain
 from sexpdata import loads, dumps, Symbol
 import copy
+import inspect
 
 VARIABLE   = 1
 EXPR       = 2
@@ -117,6 +118,13 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                 new_binds = copy.copy(binds)
                 new_binds[tail[2][1]] = res
                 yield new_binds
+        elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
+            res = db.get_value(tail[0][1], tail[1][1])
+            if res and res == tail[2][1]:
+                yield binds
+            elif not res:
+                db.add((tail[0][1], tail[1][1], tail[2][1]))
+                yield binds
         else:
             for (e, a, v) in db.eavs.values():
                 eav_rule = [(LITERAL, db.entities[e]),
@@ -169,14 +177,14 @@ def create_rule(lst):
                     rule.append((EXPR, expr))
             elif in_expr:
                 expr.append(e)
-            elif type(e) == str and e[0].isupper():
+            elif type(e) == str and e[0].isupper() and not " " in e:
                 rule.append((VARIABLE, e))
             else:
                 rule.append((LITERAL, e))
     return rule
 
 def body(st):
-    return create_rule(loads("(& " + body + ")"))
+    return create_rule(loads("(& " + st + ")")), inspect.cleandoc(st)
 
 class EAVDatabase:
     def __init__(self):
@@ -229,7 +237,10 @@ class EAVDatabase:
 
     def get_value(self, entity, attr):
         h = eav_hash(self.entities.index(entity), self.attributes.index(attr))
-        return self.eavs[h]
+        if h in self.eavs:
+            return self.eavs[h][2]
+        else:
+            return None
 
     def create_hashmaps_data(self):
         data = []
@@ -251,11 +262,13 @@ class EAVDatabase:
 
         return data
 
-    def add_rule(self, name, args, rule):
+    def add_rule(self, name, args, rule, text, lang=0):
         self.rules[name] = {
             "name": name,
             "args": args,
-            "body": rule
+            "body": rule,
+            "text": text,
+            "lang": lang
         }
         return self
 
@@ -278,13 +291,17 @@ class EAVDatabase:
             .add(("mam_cool@gmail.com", "mother", "mammam_cool@gmail.com"))
 
             .add(("papa_cool@gmail.com", "name", "John Cool"))
+            .add(("papa_cool@gmail.com", "age", 56))
 
             .add(("mampa_cool@gmail.com", "name", "Rose Cool"))
+            .add(("mampa_cool@gmail.com", "age", 53))
 
             .add(("pamam_cool@gmail.com", "name", "Ed Cool"))
+            .add(("pamam_cool@gmail.com", "age", 58))
 
             .add(("mammam_cool@gmail.com", "name", "Julie Cool"))
-            .add_rule("grandfather", ["Person", "Goal"], body("""
+            .add(("mammam_cool@gmail.com", "age", 59))
+            .add_rule("grandfather", ["Person", "Goal"], *body("""
             (Person father X)
             (X father Goal)
             """))

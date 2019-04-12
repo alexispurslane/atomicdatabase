@@ -8,7 +8,7 @@ setup(name='Atomic Database',
               'atomicdb = AtomicDatabase.__main__:run'
           ]
       },
-      install_requires=['toga'],
+      install_requires=['kivy'],
 
       package_data={
           # If any package contains *.txt or *.rst files, include them:
