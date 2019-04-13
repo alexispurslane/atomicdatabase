@@ -1,4 +1,5 @@
 import re
+import os
 from collections import namedtuple
 from utils import *
 from enum import Enum
@@ -322,13 +323,13 @@ class EAVDatabase:
 
 def save_to_file(db, name):
     print("Saved to: " + name)
-    outfile = open(name,'wb')
+    outfile = open(os.path.expanduser(os.path.expandvars(name)),'wb')
     pickle.dump(db, outfile)
     outfile.close()
 
 def load_from_file(name):
     print("Load from: " + name)
-    infile = open(name,'rb')
+    infile = open(os.path.expanduser(os.path.expandvars(name)),'rb')
     db = pickle.load(infile)
     infile.close()
     return db
