@@ -1,5 +1,6 @@
 import re
 import os
+import hashlib
 from collections import namedtuple
 from utils import *
 from enum import Enum
@@ -121,6 +122,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             if res:
                 new_binds = copy.copy(binds)
                 new_binds[tail[2][1]] = res
+                print(new_binds)
                 yield new_binds
         elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
             res = db.get_value(tail[0][1], tail[1][1])
@@ -136,6 +138,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                             (LITERAL, v)]
                 res = unify(tail, eav_rule, copy.copy(binds))
                 if res != None:
+                    print(res)
                     yield res
     elif head == UNIFY:
         res = unify(tail[0], tail[1], copy.copy(binds))
@@ -153,21 +156,21 @@ def clean_symbol(e):
     else:
         return e
 
-def create_rule(lst, entities):
+def create_rule(lst, entities, uuid=None):
     rule = []
     lst = [clean_symbol(sym) for sym in lst]
     if lst[0] == "&":
         rule.append(CONJ_AND)
         for r in lst[1:]:
-            rule.append(create_rule(r, entities))
+            rule.append(create_rule(r, entities, uuid))
     elif lst[0] == "|":
         rule.append(CONJ_OR)
         for r in lst[1:]:
-            rule.append(create_rule(r, entities))
+            rule.append(create_rule(r, entities, uuid))
     elif lst[0] == "unify":
         rule.append(UNIFY)
-        rule.append(create_rule(lst[1], entities)[1:])
-        rule.append(create_rule(lst[2], entities)[1:])
+        rule.append(create_rule(lst[1], entities, uuid)[1:])
+        rule.append(create_rule(lst[2], entities, uuid)[1:])
     else:
         rule.append(PREDICATE)
         in_expr = False
@@ -189,14 +192,16 @@ def create_rule(lst, entities):
                 else:
                     rule.append((LITERAL, e))
             elif isinstance(e, str) and e[0].isupper() and not " " in e:
+                if uuid:
+                    e += uuid
                 rule.append((VARIABLE, e))
             else:
                 rule.append((LITERAL, e))
     return rule
 
-def body(st):
+def body(st, uuid=None):
     new_body, entities = create_text_entities("(& " + st + ")")
-    return create_rule(loads(new_body), entities), inspect.cleandoc(st)
+    return create_rule(loads(new_body), entities, uuid), inspect.cleandoc(st)
 
 class EAVDatabase:
     def __init__(self):
@@ -276,16 +281,6 @@ class EAVDatabase:
 
         return data
 
-    def add_rule(self, name, args, rule, text, lang=0):
-        self.rules[name] = {
-            "name": name,
-            "args": args,
-            "body": rule,
-            "text": text,
-            "lang": lang
-        }
-        return self
-
     def load_examples(self):
         (
             self.add(("cool@gmail.com", "name", "Joe Cool"))
@@ -315,10 +310,6 @@ class EAVDatabase:
 
             .add(("mammam_cool@gmail.com", "name", "Julie Cool"))
             .add(("mammam_cool@gmail.com", "age", 59))
-            .add_rule("grandfather", ["Person", "Goal"], *body("""
-            (Person father X)
-            (X father Goal)
-            """))
         )
 
 def save_to_file(db, name):

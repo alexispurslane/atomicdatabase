@@ -137,7 +137,7 @@ RULE_IDS = {
     '|': eav_database.CONJ_OR,
 }
 
-def create_type(s, entities):
+def create_type(s, entities, uuid):
     try:
         return (eav_database.LITERAL, int(s))
     except:
@@ -153,12 +153,13 @@ def create_type(s, entities):
             return (eav_database.LITERAL, entities[number])
         else:
             return (eav_database.LITERAL, s)
-    elif s[0].isupper():
-        return (eav_database.VARIABLE, s.replace(".", ""))
+    elif s[0].isupper() and not (" " in s):
+        return (eav_database.VARIABLE, s.replace(".", "")+uuid)
     else:
         return (eav_database.LITERAL, s)
 
-def convert_match_to_rule(entities, match):
+def convert_match_to_rule(consts, match):
+    (entities, uuid) = consts
     global RULE_IDS
     if isinstance(match, tuple):
         (pattern, lst) = match
@@ -185,14 +186,14 @@ def convert_match_to_rule(entities, match):
 
         if entity != None and attribute != None and value != None:
             args = [entity, attribute, value]
-            return [eav_database.PREDICATE, *[create_type(x[0], entities) for x in args]]
+            return [eav_database.PREDICATE, *[create_type(x[0], entities, uuid) for x in args]]
     elif isinstance(match, str) and match in RULE_IDS:
         return RULE_IDS[match]
     else:
         return match
 
-def convert_nlast_to_rules(ast, entities):
-    res = recursive_map(entities, convert_match_to_rule, ast)
+def convert_nlast_to_rules(ast, entities, uuid=None):
+    res = recursive_map((entities, uuid), convert_match_to_rule, ast)
     if len(res) == 1:
         return res[0]
     else:

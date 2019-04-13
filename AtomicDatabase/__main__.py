@@ -1,5 +1,6 @@
 import io
 import sys
+import hashlib
 
 from sdl2 import *
 import ctypes
@@ -155,6 +156,7 @@ def draw_imgui_query_box(DB):
     if changed:
         if query_language == 0:
             query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds)
+            print(query_result)
         elif query_language == 1:
             matches, entities = nl.understand_predicate(nlp, matcher, query_value)
             query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds)
@@ -195,46 +197,49 @@ def draw_imgui_database_rules(DB):
             use_rule = rule
             if name in new_rules:
                 use_rule = new_rules[name]
-            rule_args = use_rule["args"]
+            rule_args = use_rule["args"] or []
             rule_lang = use_rule["lang"]
             rule_text = use_rule["text"]
             rule_body = use_rule["body"]
+            uuid = "-"+hashlib.md5(name.encode()).hexdigest()
             for i, arg in enumerate(rule_args):
+                arg = arg.split("-")[0]
                 changed, rule_args[i] = imgui.input_text(
-                    "##" + str(i) + "arg-" + name,
+                    "##" + str(i) + "arg-" + uuid,
                     arg,
                     26,
                     imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
                 )
                 imgui.same_line()
 
-            if imgui.button("+"):
+            if imgui.button("+##" + uuid):
                 rule_args.append("NewArgument")
+                print(rule_args)
             imgui.same_line()
 
             clicked, rule_lang = imgui.combo(
-                "##lang-" + name,
+                "##lang-" + uuid,
                 rule_lang,
                 ["S-Expr", "NL"]
             )
             imgui.pop_item_width()
             changed, rule_text = imgui.input_text_multiline(
-                '##body-' + name,
+                '##body-' + uuid,
                 rule_text,
                 2056,
                 500,
                 300,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE,
             )
-            if imgui.button("Done"):
+            if imgui.button("Done##"+uuid):
                 if rule_lang == 0:
-                    rule_body, rule_text = eav.body(rule_text)
+                    rule_body, rule_text = eav.body(rule_text, uuid)
                 elif rule_lang == 1:
                     matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
-                    rule_body = nl.convert_nlast_to_rules(matches, entities)
+                    rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
             new_rules[name] = {
                 "name": name,
-                "args": rule_args,
+                "args": [arg+uuid for arg in rule_args],
                 "lang": rule_lang,
                 "text": rule_text,
                 "body": rule_body
@@ -258,9 +263,9 @@ def draw_imgui_database_rules(DB):
         )
         imgui.separator()
         if changed or imgui.button("OK"):
-            if len(name) > 0:
+            if len(new_name) > 0:
                 new_rules[new_name] = {
-                    "name": name,
+                    "name": new_name,
                     "args": [],
                     "lang": 0,
                     "text": "",
