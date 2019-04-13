@@ -299,6 +299,7 @@ def run():
     show_load_db = False
 
     while running:
+        imgui.styled(imgui.STYLE_CHILD_WINDOW_ROUNDING, 0)
         while SDL_PollEvent(ctypes.byref(event)) != 0:
             if event.type == SDL_QUIT:
                 running = False
