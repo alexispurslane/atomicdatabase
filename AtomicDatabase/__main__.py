@@ -1,3 +1,4 @@
+import io
 import sys
 
 from sdl2 import *
@@ -153,7 +154,7 @@ def draw_imgui_query_box(DB):
 
     if changed:
         if query_language == 0:
-            query_result = eav.evaluate_rule(DB, eav.create_rule(loads(query_value)), query_binds)
+            query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds)
         elif query_language == 1:
             matches, entities = nl.understand_predicate(nlp, matcher, query_value)
             query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds)
@@ -206,6 +207,11 @@ def draw_imgui_database_rules(DB):
                     imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
                 )
                 imgui.same_line()
+
+            if imgui.button("+"):
+                rule_args.append("NewArgument")
+            imgui.same_line()
+
             clicked, rule_lang = imgui.combo(
                 "##lang-" + name,
                 rule_lang,
@@ -217,7 +223,7 @@ def draw_imgui_database_rules(DB):
                 rule_text,
                 2056,
                 500,
-                500,
+                300,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE,
             )
             if imgui.button("Done"):
@@ -250,31 +256,31 @@ def draw_imgui_database_rules(DB):
             26,
             imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
         )
-        if changed:
-            new_rules[name] = {
-                "name": name,
-                "args": [],
-                "lang": 0,
-                "text": "",
-                "body": []
-            }
-            imgui.close_current_popup()
         imgui.separator()
-        if imgui.button("OK"):
-            new_rules[name] = {
-                "name": name,
-                "args": [],
-                "lang": 0,
-                "text": "",
-                "body": []
-            }
-            imgui.close_current_popup()
+        if changed or imgui.button("OK"):
+            if len(name) > 0:
+                new_rules[new_name] = {
+                    "name": name,
+                    "args": [],
+                    "lang": 0,
+                    "text": "",
+                    "body": []
+                }
+                imgui.close_current_popup()
         if imgui.button("Cancel"):
             imgui.close_current_popup()
+        imgui.end_popup()
     imgui.end()
 
+database_name = "Untitled"
 def run():
-    global DB
+    global DB, database_name
+    font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
+        "AtomicDatabase/Roboto-Light.ttf", 20
+    )
+    font_extra2 = imgui.get_io().fonts.add_font_from_file_ttf(
+        "AtomicDatabase/RobotoMono-Light.ttf", 20
+    )
     window, gl_context = impl_pysdl2_init()
     renderer = SDL2Renderer(window)
 
@@ -284,6 +290,8 @@ def run():
     show_eav_db = False
     show_table_db = True
     show_rules_db = False
+    show_save_as = False
+    show_load_db = False
 
     while running:
         while SDL_PollEvent(ctypes.byref(event)) != 0:
@@ -293,10 +301,32 @@ def run():
             renderer.process_event(event)
         renderer.process_inputs()
 
+        #imgui.push_font(font_extra)
         imgui.new_frame()
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
+                clicked_save, selected_save = imgui.menu_item(
+                    "Save",
+                )
+
+                if clicked_save:
+                    eav.save_to_file(DB, database_name)
+
+                clicked_save_as, selected_save_as = imgui.menu_item(
+                    "Save As...",
+                )
+
+                if clicked_save_as:
+                    show_save_as = True
+
+                clicked_load, selected_load = imgui.menu_item(
+                    "Load File...",
+                )
+
+                if clicked_load:
+                    show_load_db = True
+
                 clicked_load_example, selected_load_example = imgui.menu_item(
                     "Load Example Database",
                 )
@@ -328,12 +358,57 @@ def run():
 
             imgui.end_main_menu_bar()
 
+        if show_load_db:
+            imgui.open_popup("load-db")
+        if show_save_as:
+            imgui.open_popup("save-as")
+
+        if imgui.begin_popup("save-as"):
+            imgui.text("Database Filename:")
+            imgui.separator()
+            changed, new_name = imgui.input_text(
+                "##database-name",
+                "",
+                26,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+            if changed or imgui.button("OK"):
+                database_name = new_name
+                eav.save_to_file(DB, database_name)
+                show_save_as = False
+                imgui.close_current_popup()
+            if imgui.button("Cancel"):
+                show_save_as = False
+                imgui.close_current_popup()
+            imgui.end_popup()
+
+        if imgui.begin_popup("load-db"):
+            imgui.text("Database Filename:")
+            imgui.separator()
+            changed, new_name = imgui.input_text(
+                "##database-name",
+                "",
+                26,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+            if changed or imgui.button("OK"):
+                database_name = new_name
+                DB = eav.load_from_file(database_name)
+                show_load_db = False
+                imgui.close_current_popup()
+            if imgui.button("Cancel"):
+                show_load_db = False
+                imgui.close_current_popup()
+            imgui.end_popup()
+
         if show_table_db:
             draw_imgui_table_database(DB)
         if show_eav_db:
             draw_imgui_eav_database(DB)
         if show_rules_db:
+            imgui.push_font(font_extra2)
             draw_imgui_database_rules(DB)
+            imgui.pop_font()
         draw_imgui_query_box(DB)
 
         gl.glClearColor(1., 1., 1., 1)

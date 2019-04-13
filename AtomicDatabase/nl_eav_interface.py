@@ -1,4 +1,5 @@
 import eav_database
+from utils import *
 
 import spacy
 from spacy.matcher import Matcher
@@ -46,24 +47,6 @@ def create_matcher(nlp):
         matcher.add(k, None, v)
 
     return matcher
-
-def create_text_entities(string):
-    new_str = ""
-    in_quot = False
-    entities = []
-    for c in string:
-        if c == "\"":
-            in_quot = not in_quot
-            if in_quot:
-                entities.append("")
-            else:
-                new_str += "ENTITY_" + str(len(entities) - 1)
-        else:
-            if in_quot:
-                entities[-1] += c
-            else:
-                new_str += c
-    return new_str, entities
 
 def get_matches(matches, doc):
     return [(doc.vocab.strings[match_id], doc[start:end]) for match_id, start, end in matches]
@@ -155,6 +138,13 @@ RULE_IDS = {
 }
 
 def create_type(s, entities):
+    try:
+        return (eav_database.LITERAL, int(s))
+    except:
+        try:
+            return (eav_database.LITERAL, float(s))
+        except:
+            pass
     if "ENTITY_" in s:
         rematch = re.search("([0-9]+)", s)
         if rematch:

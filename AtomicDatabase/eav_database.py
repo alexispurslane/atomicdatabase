@@ -1,9 +1,12 @@
+import re
 from collections import namedtuple
+from utils import *
 from enum import Enum
 from itertools import chain
 from sexpdata import loads, dumps, Symbol
 import copy
 import inspect
+import pickle
 
 VARIABLE   = 1
 EXPR       = 2
@@ -149,21 +152,21 @@ def clean_symbol(e):
     else:
         return e
 
-def create_rule(lst):
+def create_rule(lst, entities):
     rule = []
     lst = [clean_symbol(sym) for sym in lst]
     if lst[0] == "&":
         rule.append(CONJ_AND)
         for r in lst[1:]:
-            rule.append(create_rule(r))
+            rule.append(create_rule(r, entities))
     elif lst[0] == "|":
         rule.append(CONJ_OR)
         for r in lst[1:]:
-            rule.append(create_rule(r))
+            rule.append(create_rule(r, entities))
     elif lst[0] == "unify":
         rule.append(UNIFY)
-        rule.append(create_rule(lst[1])[1:])
-        rule.append(create_rule(lst[2])[1:])
+        rule.append(create_rule(lst[1], entities)[1:])
+        rule.append(create_rule(lst[2], entities)[1:])
     else:
         rule.append(PREDICATE)
         in_expr = False
@@ -177,14 +180,22 @@ def create_rule(lst):
                     rule.append((EXPR, expr))
             elif in_expr:
                 expr.append(e)
-            elif type(e) == str and e[0].isupper() and not " " in e:
+            elif isinstance(e, str) and "ENTITY_" in e:
+                rematch = re.search("([0-9]+)", e)
+                if rematch:
+                    number = int(rematch.group())
+                    rule.append((LITERAL, entities[number]))
+                else:
+                    rule.append((LITERAL, e))
+            elif isinstance(e, str) and e[0].isupper() and not " " in e:
                 rule.append((VARIABLE, e))
             else:
                 rule.append((LITERAL, e))
     return rule
 
 def body(st):
-    return create_rule(loads("(& " + st + ")")), inspect.cleandoc(st)
+    new_body, entities = create_text_entities("(& " + st + ")")
+    return create_rule(loads(new_body), entities), inspect.cleandoc(st)
 
 class EAVDatabase:
     def __init__(self):
@@ -236,6 +247,8 @@ class EAVDatabase:
         return (eav for (h, eav) in self.eavs.items() if eav[1] == ai)
 
     def get_value(self, entity, attr):
+        if not (entity in self.entities) or (not attr in self.attributes):
+            return None
         h = eav_hash(self.entities.index(entity), self.attributes.index(attr))
         if h in self.eavs:
             return self.eavs[h][2]
@@ -307,5 +320,16 @@ class EAVDatabase:
             """))
         )
 
+def save_to_file(db, name):
+    print("Saved to: " + name)
+    outfile = open(name,'wb')
+    pickle.dump(db, outfile)
+    outfile.close()
 
+def load_from_file(name):
+    print("Load from: " + name)
+    infile = open(name,'rb')
+    db = pickle.load(infile)
+    infile.close()
+    return db
 
