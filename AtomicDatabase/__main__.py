@@ -128,7 +128,7 @@ def draw_query(binds):
 query_language = 1
 query_value = ""
 query_result = None
-query_binds = {}
+query_binds = None
 def draw_imgui_query_box(DB):
     global query_language, query_value, query_result, query_binds
 
@@ -146,31 +146,35 @@ def draw_imgui_query_box(DB):
         imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
     )
 
-    if query_binds:
+    if query_binds == {}:
+        imgui.text("The results match, but no bindings were created")
+    elif query_binds:
         draw_query(query_binds)
-    elif query_result:
-        imgui.text("Bindings empty. Try clicking 'Next'")
+    elif query_binds is None and query_result:
+        imgui.text("Bindings empty but backtracker still present. Try clicking 'Next'")
     else:
         imgui.text("No results")
 
     if changed:
         if query_language == 0:
-            query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds)
-            print(query_result)
+            query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds or {})
         elif query_language == 1:
             matches, entities = nl.understand_predicate(nlp, matcher, query_value)
-            query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds)
+            query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
 
     if imgui.button("Clear"):
         imgui.open_popup("confirm")
     imgui.same_line()
 
     if imgui.button("Next"):
-        try:
-            query_binds = next(query_result)
-        except:
-            query_binds = {}
-            query_result = None
+        print("--- NEXT")
+        #try:
+        query_binds = next(query_result)
+        print("Query Binds: " + str(query_binds))
+        # except:
+        #     print("No more results")
+        #     query_binds = None
+        #    query_result = None
 
     if imgui.begin_popup("confirm"):
         imgui.text("Are you sure you want to clear the bindings?")
@@ -299,7 +303,6 @@ def run():
     show_load_db = False
 
     while running:
-        imgui.styled(imgui.STYLE_CHILD_WINDOW_ROUNDING, 0)
         while SDL_PollEvent(ctypes.byref(event)) != 0:
             if event.type == SDL_QUIT:
                 running = False
@@ -309,6 +312,32 @@ def run():
 
         #imgui.push_font(font_extra)
         imgui.new_frame()
+        imgui.push_style_var(imgui.STYLE_WINDOW_PADDING, imgui.Vec2(5, 5))
+        imgui.push_style_var(imgui.STYLE_WINDOW_ROUNDING, 0)
+        imgui.push_style_var(imgui.STYLE_CHILD_WINDOW_ROUNDING, 0)
+        imgui.push_style_var(imgui.STYLE_FRAME_PADDING, imgui.Vec2(11, 5))
+        imgui.push_style_var(imgui.STYLE_FRAME_ROUNDING, 5)
+        imgui.push_style_var(imgui.STYLE_ITEM_SPACING, imgui.Vec2(10, 10))
+        imgui.push_style_var(imgui.STYLE_ITEM_INNER_SPACING, imgui.Vec2(5, 5))
+        imgui.push_style_color(imgui.COLOR_TEXT, 0.00, 0.00, 0.00, 1.00)
+        imgui.push_style_color(imgui.COLOR_TEXT, 0.00, 0.00, 0.00, 1.00)
+        imgui.push_style_color(imgui.COLOR_WINDOW_BACKGROUND, 0.93, 0.94, 0.95, 1.00)
+        imgui.push_style_color(imgui.COLOR_POPUP_BACKGROUND, 0.47, 0.56, 0.61, 1.00)
+        imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND, 0.47, 0.56, 0.61, 1.00)
+        imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND_HOVERED, 0.40, 0.50, 0.55, 1.00)
+        imgui.push_style_color(imgui.COLOR_FRAME_BACKGROUND_ACTIVE, 0.54, 0.63, 0.68, 1.00)
+        imgui.push_style_color(imgui.COLOR_TITLE_BACKGROUND, 0.26, 0.65, 0.96, 1.00)
+        imgui.push_style_color(imgui.COLOR_TITLE_BACKGROUND_COLLAPSED, 0.26, 0.65, 0.96, 1.00)
+        imgui.push_style_color(imgui.COLOR_TITLE_BACKGROUND_ACTIVE, 0.39, 0.71, 0.96, 1.00)
+        imgui.push_style_color(imgui.COLOR_MENUBAR_BACKGROUND, 0.26, 0.65, 0.96, 1.00)
+        imgui.push_style_color(imgui.COLOR_SCROLLBAR_GRAB_ACTIVE, 0.40, 0.40, 0.80, 0.40)
+        imgui.push_style_color(imgui.COLOR_COMBO_BACKGROUND, 0.40, 0.50, 0.55, 1.00)
+        imgui.push_style_color(imgui.COLOR_BUTTON, 0.00, 0.00, 0.00, 0.07)
+        imgui.push_style_color(imgui.COLOR_BUTTON_HOVERED, 0.90, 0.90, 0.90, 0.50)
+        imgui.push_style_color(imgui.COLOR_BUTTON_ACTIVE, 0.54, 0.63, 0.68, 1.00)
+        imgui.push_style_color(imgui.COLOR_HEADER, 0.00, 0.00, 0.00, 0.00)
+        imgui.push_style_color(imgui.COLOR_HEADER_HOVERED, 0.05, 0.28, 0.63, 0.20)
+        imgui.push_style_color(imgui.COLOR_HEADER_ACTIVE, 0.05, 0.28, 0.63, 0.26)
 
         if imgui.begin_main_menu_bar():
             if imgui.begin_menu("File", True):
@@ -417,6 +446,8 @@ def run():
             imgui.pop_font()
         draw_imgui_query_box(DB)
 
+        imgui.pop_style_var(7)
+        imgui.pop_style_color(19)
         gl.glClearColor(1., 1., 1., 1)
         gl.glClear(gl.GL_COLOR_BUFFER_BIT)
 

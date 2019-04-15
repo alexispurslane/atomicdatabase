@@ -168,8 +168,8 @@ def convert_match_to_rule(consts, match):
             entity = [x.text for x in lst if x.dep_ == 'poss']
             attribute = [x.text for x in lst if x.pos_ != 'PUNCT']
             return [eav_database.PREDICATE,
-                    create_type(entity[0], entities),
-                    create_type(attribute[-1], entities),
+                    create_type(entity[0], entities, uuid),
+                    create_type(attribute[-1], entities, uuid),
                     (eav_database.VARIABLE, 'Result')]
         elif pattern == 'PredicateContraction':
             entity    = [x.text for x in lst if x.pos_ in ['NOUN', 'PROPN']]

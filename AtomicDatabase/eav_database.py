@@ -19,6 +19,8 @@ CONJ_OR    = 1
 CONJ_AND   = 2
 PREDICATE  = 3
 UNIFY      = 4
+CONJ_COMP  = 5
+CONJ_COND  = 6
 
 def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
@@ -27,6 +29,8 @@ def eval_expr(val, binds):
     return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def unify(a, b, binds={}):
+    print("UNIFY " + str(a) + " and " + str(b))
+    print("BINDS: " + str(binds))
     for i in range(0, min(len(a), len(b))):
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
@@ -66,6 +70,7 @@ def unify(a, b, binds={}):
                 continue
             else:
                 return None
+    print("RESULT: " + str(binds))
     return binds
 
 def peek(iterable):
@@ -87,22 +92,8 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
 def get_variable_names(lst):
     return [name  if tpe == VARIABLE else None for (tpe, name) in lst]
 
-def cleanse(unsafe_tail, binds, subs):
-    tail = []
-    print(str(subs))
-    for el in unsafe_tail:
-        if el[0] == VARIABLE and el[1] in subs and subs[el[1]] != None:
-            print("SUBS: " + str(el[1]) + " = " + str(subs[el[1]]))
-            tail.append((el[0], subs[el[1]]))
-        elif type(el) == list:
-            tail.append([el[0]] + cleanse(el[1:], binds, subs))
-        else:
-            tail.append(el)
-    return tail
-
 def evaluate_rule(db, rule, binds={}, subs={}):
     head, *tail = rule
-    tail = cleanse(tail, binds, subs)
     print(head, tail)
     if head == PREDICATE:
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
@@ -116,7 +107,10 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             print("ARGS:\t" + str(rule["args"]))
 
             for res in evaluate_rule(db, rule["body"], binds, subs=substitutions):
-                yield { substitutions[k]: res[substitutions[k]] for k in rule["args"] if substitutions[k] }
+                print("RES SUBS: " + str(substitutions))
+                print("RULE RES: " + str(res))
+                new_res = { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
+                yield new_res
         elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
             res = db.get_value(tail[0][1], tail[1][1])
             if res:
@@ -140,13 +134,43 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                 if res != None:
                     print(res)
                     yield res
+    elif head == CONJ_COMP:
+        op, *args = tail
+        vals = [binds[e[1]] if e[0] == VARIABLE and e[1] in binds else e[1] for e in args]
+        failed = False
+        last = None
+        for v in vals:
+            choice = False
+            if last:
+                if op == "<":
+                    choice = v > last
+                elif op == ">":
+                    choice = v < last
+                elif op == ">=":
+                    choice = v <= last
+                elif op == "<=":
+                    choice = v >= last
+            if choice or last is None:
+                last = v
+            else:
+                failed = True
+                break
+        if not failed:
+            yield binds
     elif head == UNIFY:
-        res = unify(tail[0], tail[1], copy.copy(binds))
+        new_binds = copy.copy(binds)
+        res = unify(tail[0], tail[1], new_binds)
         if res != None:
             yield res
     elif head == CONJ_OR:
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
+    elif head == CONJ_COND:
+        for tail_x in tail:
+            res = evaluate_rule(db, tail_x, copy.copy(binds), subs)
+            if res != None:
+                yield from res
+                return
     elif head == CONJ_AND:
         yield from evaluate_and_rule(db, tail, binds, subs)
 
@@ -167,6 +191,14 @@ def create_rule(lst, entities, uuid=None):
         rule.append(CONJ_OR)
         for r in lst[1:]:
             rule.append(create_rule(r, entities, uuid))
+    elif lst[0] == "?":
+        rule.append(CONJ_COND)
+        for r in lst[1:]:
+            rule.append(create_rule(r, entities, uuid))
+    elif lst[0] in ["<", ">", "<=", ">="]:
+        rule.append(CONJ_COMP)
+        rule.append(lst[0])
+        rule.extend(create_rule(lst[1:], entities, uuid)[1:])
     elif lst[0] == "unify":
         rule.append(UNIFY)
         rule.append(create_rule(lst[1], entities, uuid)[1:])
