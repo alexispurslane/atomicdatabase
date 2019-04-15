@@ -166,15 +166,15 @@ def draw_imgui_query_box(DB):
         imgui.open_popup("confirm")
     imgui.same_line()
 
-    if imgui.button("Next"):
+    if imgui.button("Next") and query_result:
         print("--- NEXT")
-        #try:
-        query_binds = next(query_result)
-        print("Query Binds: " + str(query_binds))
-        # except:
-        #     print("No more results")
-        #     query_binds = None
-        #    query_result = None
+        try:
+            query_binds = next(query_result)
+            print("Query Binds: " + str(query_binds))
+        except StopIteration:
+            print("No more results")
+            query_binds = None
+            query_result = None
 
     if imgui.begin_popup("confirm"):
         imgui.text("Are you sure you want to clear the bindings?")

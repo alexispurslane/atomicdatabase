@@ -29,8 +29,6 @@ def eval_expr(val, binds):
     return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def unify(a, b, binds={}):
-    print("UNIFY " + str(a) + " and " + str(b))
-    print("BINDS: " + str(binds))
     for i in range(0, min(len(a), len(b))):
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
@@ -70,7 +68,6 @@ def unify(a, b, binds={}):
                 continue
             else:
                 return None
-    print("RESULT: " + str(binds))
     return binds
 
 def peek(iterable):
@@ -89,34 +86,32 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
         for p in possible:
             yield from evaluate_and_rule(db, tail, p, subs)
 
-def get_variable_names(lst):
-    return [name  if tpe == VARIABLE else None for (tpe, name) in lst]
-
 def evaluate_rule(db, rule, binds={}, subs={}):
     head, *tail = rule
-    print(head, tail)
     if head == PREDICATE:
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
             rule = db.rules[tail[1][1]]
-            var_names = get_variable_names(tail)
+
+            var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
             params = var_names[:1] + var_names[2:]
             substitutions = dict(zip(rule["args"], params))
+
+            lit_vals = [val if tpe == LITERAL else None for (tpe, val) in tail]
+            inputs = lit_vals[:1] + lit_vals[2:]
+            input_binds = { k: v for k, v in zip(rule["args"], inputs) if v }
 
             print("CALL RULE:\t" + tail[1][1])
             print("PARAMS:\t" + str(params))
             print("ARGS:\t" + str(rule["args"]))
+            print("BINDINGS: " + str(input_binds))
 
-            for res in evaluate_rule(db, rule["body"], binds, subs=substitutions):
-                print("RES SUBS: " + str(substitutions))
-                print("RULE RES: " + str(res))
-                new_res = { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
-                yield new_res
+            for res in evaluate_rule(db, rule["body"], input_binds, subs=substitutions):
+                yield { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
         elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
             res = db.get_value(tail[0][1], tail[1][1])
             if res:
                 new_binds = copy.copy(binds)
                 new_binds[tail[2][1]] = res
-                print(new_binds)
                 yield new_binds
         elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
             res = db.get_value(tail[0][1], tail[1][1])
@@ -132,7 +127,6 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                             (LITERAL, v)]
                 res = unify(tail, eav_rule, copy.copy(binds))
                 if res != None:
-                    print(res)
                     yield res
     elif head == CONJ_COMP:
         op, *args = tail
@@ -170,7 +164,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             res = evaluate_rule(db, tail_x, copy.copy(binds), subs)
             if res != None:
                 yield from res
-                return
+                return iter([])
     elif head == CONJ_AND:
         yield from evaluate_and_rule(db, tail, binds, subs)
 
@@ -297,7 +291,6 @@ class EAVDatabase:
         data = []
         for (entity, attribute, value) in sorted(self.eavs.values(), key=lambda x: x[0]):
             if entity >= len(data):
-                print("creating entity " + str(entity))
                 data.insert(entity, { "entity": self.entities[entity] })
                 data[entity][self.attributes[attribute]] = value
 
