@@ -92,6 +92,10 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
             rule = db.rules[tail[1][1]]
 
+            tail = [(LITERAL, binds[name])
+                    if tpe == VARIABLE and name in binds
+                    else (tpe, name)
+                    for tpe, name in tail]
             var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
             params = var_names[:1] + var_names[2:]
             substitutions = dict(zip(rule["args"], params))
