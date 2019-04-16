@@ -1,5 +1,7 @@
 # Atomic Database 2.0
 
+![Main Screenshot](Screenshots/2019-04-15-193029_2560x1440_scrot.png)
+
 ## What is Atomic Database
 
 Atomic Database is a very simple entity-attribute-value database back end with a
