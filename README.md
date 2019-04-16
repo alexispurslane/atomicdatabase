@@ -66,6 +66,17 @@ My plan looks like this at the moment:
       and a table view on the other side for the actual database, and then a
       long query box at the bottom.
 - [X] Add advanced language constructs such as `cond`, unification, scope.
+- [ ] Add metadata relational database for attributes and (optionally) entities. This metadata should include:
+      * Official name
+      * Range of normal (or allowed) values
+      * Data type
+      * Description
+      * (Auto generated) used by entities
+- [ ] Use metadata to display UI elements in the database view
+- [ ] Add validation and type-checking warnings (or errors!) to language and UI
+- [ ] Add automatic conversion to a relational database for export
+- [ ] Search functions should be available for entities, attributes. Use internal query system for this, but present a nice UI.
+- [ ] Create a separate entity type to validate with, instead of strings
 - [ ] Extend the natural language interface to support some (all if possible!)
       advanced language constructs
 - [ ] Focus on adding more variety to the NL recognizer
