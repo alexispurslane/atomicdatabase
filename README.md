@@ -79,3 +79,38 @@ My plan looks like this at the moment:
 - [ ] Create a method of making UI elements and interfaces from inside rules
      (perhaps a main `createGUI` rule?)
 
+## Requirements
+
+The requirements are stored in [requirements.txt](requirements.txt), generated
+by `pip freeze`. The main packages you have to install if you can't use the
+`requirements.txt` are:
+
+- spaCy and `en_core_web_sm`
+    * Which you can install by doing `python -m download en_core_web_sm` after
+      you've installed spaCy
+- imgui
+
+I've also created a setup.py, so if you want to install Atomic Database as the
+commandline binary `atomicdb`, use:
+```
+python setup.py install
+```
+
+If you're contributing, you can use:
+```
+python setup.py develop
+```
+
+## Screenshots
+
+Coming soon!
+
+## Videos
+
+Also coming soon!
+
+## Contributing
+
+If you want to contribute, **awesome**! Please fork the project and do PRs from
+there. Never commit broken code (if you know its broken) as a rule. If you have
+questions, you can open issues for them, I'll make a documentation label.

@@ -1,10 +1,10 @@
 Metadata-Version: 1.0
 Name: Atomic-Database
 Version: 2.0
-Summary: A EAV-based, logic-powered, natural language enabled, database.
-Home-page: UNKNOWN
+Summary: A EAV-based, logic-powered, natural language enabled, deductive database.
+Home-page: https://github.com/christopherdumas/atomicdatabase/tree/v2.0
 Author: Christopher Dumas
-Author-email: christopherdumas@gmai.com
+Author-email: christopherdumas@gmail.com
 License: MIT
 Description: UNKNOWN
 Platform: UNKNOWN

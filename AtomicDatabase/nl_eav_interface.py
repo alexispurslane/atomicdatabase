@@ -1,4 +1,4 @@
-import eav_database
+import AtomicDatabase.eav_database as eav_database
 from utils import *
 
 import spacy
