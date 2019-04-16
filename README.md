@@ -47,19 +47,35 @@ My plan looks like this at the moment:
       really well to logic programming and natural language mapping. I'll try to
       use real algorithms from Wikipedia and other resources so it isn't just a
       2D array.
-- [ ] Figure out how to store databases
+- [X] Figure out how to store databases
 - [X] Implement a simple logic programming language. I didn't want to use
       another library like I did for Atomic Database 1.0 because this database
       has some very specific needs, and for AD1 that led to some very hacky,
       unstable code. Plus, implementing my own is fun!
-- [ ] Implement a Natural Language layer to interface with both the database or
+- [X] Implement a Natural Language layer to interface with both the database or
       the logic language depending on what type of request is fed to it. This is
       going to be difficult to do reliably, so...
 - [X] Make a simple S-expression language to interface more reliably and
       powerfully with the database. Call it a Pro-mode or something.
 - [X] Implement a way to reference and store "rules" about the data relations in
       the database. This is a hugely important one.
-- [ ] Implement a UI in Kivy. This can be simple: a list of text boxes on one
+- [X] Implement a UI in ImGUI. This can be simple: a list of text boxes on one
       side, each with an editable title and a "new" button below them for rules,
       and a table view on the other side for the actual database, and then a
       long query box at the bottom.
+- [X] Add advanced language constructs such as `cond`, unification, scope.
+- [ ] Extend the natural language interface to support some (all if possible!)
+      advanced language constructs
+- [ ] Focus on adding more variety to the NL recognizer
+- [ ] Create a chatbot (or "repl") interface for adding data and querying the
+      database, where the history of your bindings and queries is interactable
+      inline in the transcript, and when you click next on any result, the
+      backtracking is visible
+- [ ] Create an entity tree relation graph, and allow entity dropdowns to be
+      turned into regular text at the user's convenience.
+- [ ] Create a way to externally save and load plain-test rules and query
+      transcripts
+- [ ] Allow saving and loading of the database in plaintext
+- [ ] Create a method of making UI elements and interfaces from inside rules
+     (perhaps a main `createGUI` rule?)
+
