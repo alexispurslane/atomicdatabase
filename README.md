@@ -67,7 +67,7 @@ My plan looks like this at the moment:
       long query box at the bottom.
 - [X] Add advanced language constructs such as `cond`, unification, scope.
 - [ ] Add metadata relational database for attributes and (optionally) entities. This metadata should include:
-      * Official name
+    * Official name
       * Range of normal (or allowed) values
       * Data type
       * Description
