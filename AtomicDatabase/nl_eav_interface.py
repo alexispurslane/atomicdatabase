@@ -137,7 +137,7 @@ RULE_IDS = {
     '|': eav_database.CONJ_OR,
 }
 
-def create_type(s, entities, uuid):
+def create_type(s, entities, uuid=""):
     try:
         return (eav_database.LITERAL, int(s))
     except:
@@ -192,7 +192,7 @@ def convert_match_to_rule(consts, match):
     else:
         return match
 
-def convert_nlast_to_rules(ast, entities, uuid=None):
+def convert_nlast_to_rules(ast, entities, uuid=""):
     res = recursive_map((entities, uuid), convert_match_to_rule, ast)
     if len(res) == 1:
         return res[0]

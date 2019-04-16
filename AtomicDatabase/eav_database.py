@@ -119,6 +119,9 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             lit_vals = [val if tpe == LITERAL else None for (tpe, val) in tail]
             inputs = lit_vals[:1] + lit_vals[2:]
             input_binds = { k: v for k, v in zip(rule["args"], inputs) if v }
+            for key, value in binds.items():
+                if not key in input_binds:
+                    input_binds[key] = value
 
             print("CALL RULE:\t" + tail[1][1])
             print("PARAMS:\t" + str(params))
@@ -126,7 +129,12 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             print("BINDINGS: " + str(input_binds))
 
             for res in evaluate_rule(db, rule["body"], input_binds, subs=substitutions):
-                yield { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
+                output_binds = { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
+                for key, value in binds.items():
+                    if not key in output_binds:
+                        output_binds[key] = value
+
+                yield output_binds
         elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
             res = db.get_value(tail[0][1], tail[1][1])
             if res:

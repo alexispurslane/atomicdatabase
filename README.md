@@ -103,7 +103,7 @@ python setup.py develop
 
 ## Screenshots
 
-Coming soon!
+To find screenshots, look in the ["screenshots" directory](Screenshots/)
 
 ## Videos
 
