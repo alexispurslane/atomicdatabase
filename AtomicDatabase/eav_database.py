@@ -77,6 +77,21 @@ def peek(iterable):
         return None
     return chain([first], iterable)
 
+def evaluate_cond_rule(db, branches, binds={}, subs={}):
+    if branches == []:
+        return None
+    else:
+        head, *tail = branches
+        print("COND BRANCH: " + str(head))
+        print("BINDS: " + str(binds))
+        ret = evaluate_rule(db, head, binds, subs)
+        try:
+            fst = next(ret)
+            yield from chain([fst], ret)
+        except StopIteration:
+            print("No stuff")
+            yield from evaluate_cond_rule(db, tail, binds, subs)
+
 def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
     if and_clauses == []:
         yield binds
@@ -88,6 +103,7 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
 
 def evaluate_rule(db, rule, binds={}, subs={}):
     head, *tail = rule
+    print(head, tail)
     if head == PREDICATE:
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
             rule = db.rules[tail[1][1]]
@@ -164,11 +180,8 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
     elif head == CONJ_COND:
-        for tail_x in tail:
-            res = evaluate_rule(db, tail_x, copy.copy(binds), subs)
-            if res != None:
-                yield from res
-                return iter([])
+        print("COND BODY: " + str(tail))
+        yield from evaluate_cond_rule(db, tail, binds, subs)
     elif head == CONJ_AND:
         yield from evaluate_and_rule(db, tail, binds, subs)
 

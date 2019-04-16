@@ -1,6 +1,7 @@
 import io
 import sys
 import hashlib
+import sys
 
 from sdl2 import *
 import ctypes
@@ -15,7 +16,11 @@ import AtomicDatabase.nl_eav_interface as nl
 from sexpdata import loads, dumps
 import spacy
 
+database_name = "Untitled"
 DB = eav.EAVDatabase()
+if len(sys.argv) > 1:
+    DB = eav.load_from_file(sys.argv[1])
+    database_name = sys.argv[1]
 nlp = spacy.load("en_core_web_sm")
 matcher = nl.create_matcher(nlp)
 
@@ -135,12 +140,12 @@ def draw_imgui_query_box(DB):
     imgui.begin("Query...", False)
     imgui.push_item_width(100)
     clicked, query_language = imgui.combo(
-        "", query_language, ["S-Expr", "NL"]
+        "##query-language", query_language, ["S-Expr", "NL"]
     )
     imgui.pop_item_width()
     imgui.same_line()
     changed, query_value = imgui.input_text(
-        '',
+        '##query-box',
         query_value,
         256,
         imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
@@ -281,7 +286,6 @@ def draw_imgui_database_rules(DB):
         imgui.end_popup()
     imgui.end()
 
-database_name = "Untitled"
 def run():
     global DB, database_name
     font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
@@ -313,7 +317,7 @@ def run():
         #imgui.push_font(font_extra)
         imgui.new_frame()
         imgui.push_style_var(imgui.STYLE_WINDOW_PADDING, imgui.Vec2(5, 5))
-        imgui.push_style_var(imgui.STYLE_WINDOW_ROUNDING, 0)
+        imgui.push_style_var(imgui.STYLE_WINDOW_ROUNDING, 5)
         imgui.push_style_var(imgui.STYLE_CHILD_WINDOW_ROUNDING, 0)
         imgui.push_style_var(imgui.STYLE_FRAME_PADDING, imgui.Vec2(11, 5))
         imgui.push_style_var(imgui.STYLE_FRAME_ROUNDING, 5)
