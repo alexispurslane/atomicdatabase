@@ -1,6 +1,15 @@
 from setuptools import setup, find_packages
+from setuptools.command.install import install
+import subprocess
 
-setup(name='Atomic Database',
+class CustomInstallCommand(install):
+    """Custom install setup to help run shell commands (outside shell) before installation"""
+    def run(self):
+        install.run(self)
+        subprocess.run(["python3", "-m", "spacy", "download", "en"])
+
+setup(cmdclass={'install': CustomInstallCommand},
+      name='Atomic Database',
       version='2.0',
       packages=find_packages(),
       entry_points={
