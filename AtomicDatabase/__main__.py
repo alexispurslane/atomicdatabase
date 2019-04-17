@@ -134,8 +134,14 @@ query_language = 1
 query_value = ""
 query_result = None
 query_binds = None
+
+data_entity = 0
+data_attr = ""
+data_type = 1
+data_value = ""
+
 def draw_imgui_query_box(DB):
-    global query_language, query_value, query_result, query_binds
+    global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value
 
     imgui.begin("Query...", False)
     imgui.push_item_width(100)
@@ -163,14 +169,13 @@ def draw_imgui_query_box(DB):
     if changed:
         if query_language == 0:
             query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds or {})
-        elif query_language == 1:
+        elif query_language ==  1:
             matches, entities = nl.understand_predicate(nlp, matcher, query_value)
             query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
 
     if imgui.button("Clear"):
         imgui.open_popup("confirm")
     imgui.same_line()
-
     if imgui.button("Next") and query_result:
         print("--- NEXT")
         try:
@@ -180,6 +185,66 @@ def draw_imgui_query_box(DB):
             print("No more results")
             query_binds = None
             query_result = None
+
+    if imgui.button("Add New Entity"):
+        imgui.open_popup("add-entity")
+    imgui.same_line()
+    if imgui.button("+##new-data"):
+        imgui.open_popup("new-data")
+
+    if imgui.begin_popup("add-entity"):
+        changed, ent_value = imgui.input_text(
+            '##new-entity',
+            "",
+            256,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
+        if imgui.button("OK"):
+            DB.entities.append(ent_value)
+            imgui.close_current_popup()
+        if changed:
+            DB.entities.append(ent_value)
+            imgui.close_current_popup()
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            imgui.close_current_popup()
+        imgui.end_popup()
+
+    if imgui.begin_popup("new-data"):
+        changed, data_entity = imgui.combo(
+            "Entity##data-entity", data_entity, DB.entities
+        )
+        changed, data_attr = imgui.input_text(
+            'Attribute##data-attr',
+            data_attr,
+            256,
+        )
+        changed, data_type = imgui.combo(
+            "Value Type##data-type", data_type, ['int', 'string']
+        )
+        if changed and data_type == 0:
+            data_value = 0
+        elif changed and data_type == 1:
+            data_value = ""
+        if data_type == 0:
+            changed, data_value = imgui.input_int(
+                "Value##data-value-int",
+                data_value
+            )
+        else:
+            changed, data_value = imgui.input_text(
+                'Value##data-value-string',
+                data_value,
+                256,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+        if imgui.button("OK"):
+            DB.add((DB.entities[data_entity], data_attr, data_value))
+            imgui.close_current_popup()
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            imgui.close_current_popup()
+        imgui.end_popup()
 
     if imgui.begin_popup("confirm"):
         imgui.text("Are you sure you want to clear the bindings?")
@@ -194,36 +259,40 @@ def draw_imgui_query_box(DB):
     imgui.end()
 
 rule_expanded = {}
-new_rules = {}
 def draw_imgui_database_rules(DB):
-    global rule_expanded, new_rules
+    global rule_expanded
+    to_delete = []
     imgui.begin("Database Rules", False)
     for name, rule in DB.rules.items():
         rule_expanded[name], _ = imgui.collapsing_header(name, True)
 
         if rule_expanded[name]:
             imgui.push_item_width(100)
-            use_rule = rule
-            if name in new_rules:
-                use_rule = new_rules[name]
-            rule_args = use_rule["args"] or []
-            rule_lang = use_rule["lang"]
-            rule_text = use_rule["text"]
-            rule_body = use_rule["body"]
+            rule_args = rule["args"] or []
+            rule_lang = rule["lang"]
+            rule_text = rule["text"]
+            rule_body = rule["body"]
             uuid = "-"+hashlib.md5(name.encode()).hexdigest()
+            arg_changed = False
+            if imgui.button("Delete Rule##"+uuid):
+                to_delete.append(name)
             for i, arg in enumerate(rule_args):
                 arg = arg.split("-")[0]
                 changed, rule_args[i] = imgui.input_text(
                     "##" + str(i) + "arg-" + uuid,
                     arg,
                     26,
-                    imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
                 )
+                arg_changed = changed or arg_changed
                 imgui.same_line()
 
-            if imgui.button("+##" + uuid):
+            if imgui.button("+##new" + uuid):
                 rule_args.append("NewArgument")
-                print(rule_args)
+                arg_changed = True
+            imgui.same_line()
+            if imgui.button("-##del" + uuid):
+                del rule_args[-1]
+                arg_changed = True
             imgui.same_line()
 
             clicked, rule_lang = imgui.combo(
@@ -238,7 +307,6 @@ def draw_imgui_database_rules(DB):
                 2056,
                 500,
                 300,
-                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE,
             )
             if imgui.button("Done##"+uuid):
                 if rule_lang == 0:
@@ -246,17 +314,16 @@ def draw_imgui_database_rules(DB):
                 elif rule_lang == 1:
                     matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
                     rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
-            new_rules[name] = {
-                "name": name,
-                "args": [arg+uuid for arg in rule_args],
-                "lang": rule_lang,
-                "text": rule_text,
-                "body": rule_body
-            }
-    if len(new_rules) > 0:
-        for (name, rule) in new_rules.items():
-            DB.rules[name] = rule
-        new_rules = {}
+            if clicked or changed or arg_changed:
+                DB.add_rule(name, rule_args, uuid, {
+                    "lang": rule_lang,
+                    "text": rule_text,
+                    "body": rule_body
+                })
+
+    for n in to_delete:
+        del DB.rules[n]
+    to_delete = []
 
     if imgui.button("New Rule"):
         imgui.open_popup("new-rule")
@@ -273,14 +340,9 @@ def draw_imgui_database_rules(DB):
         imgui.separator()
         if changed or imgui.button("OK"):
             if len(new_name) > 0:
-                new_rules[new_name] = {
-                    "name": new_name,
-                    "args": [],
-                    "lang": 0,
-                    "text": "",
-                    "body": []
-                }
+                DB.add_rule(new_name)
                 imgui.close_current_popup()
+        imgui.same_line()
         if imgui.button("Cancel"):
             imgui.close_current_popup()
         imgui.end_popup()
@@ -416,6 +478,7 @@ def run():
                 eav.save_to_file(DB, database_name)
                 show_save_as = False
                 imgui.close_current_popup()
+            imgui.same_line()
             if imgui.button("Cancel"):
                 show_save_as = False
                 imgui.close_current_popup()
@@ -435,6 +498,7 @@ def run():
                 DB = eav.load_from_file(database_name)
                 show_load_db = False
                 imgui.close_current_popup()
+            imgui.same_line()
             if imgui.button("Cancel"):
                 show_load_db = False
                 imgui.close_current_popup()

@@ -257,9 +257,21 @@ def body(st, uuid=None):
 class EAVDatabase:
     def __init__(self):
         self.attributes = []
+        self.attribute_metadata = {}
         self.entities = []
         self.eavs = {}
         self.rules = {}
+
+    def add_rule(self, name, rule_args=[], uuid="", new_rule={
+            "lang": 0,
+            "text": "",
+            "body": ""
+        }):
+        new_rule.update({
+            "name": name,
+            "args": [arg+uuid for arg in rule_args],
+        })
+        self.rules[name] = new_rule
 
     def get_or_add_entity_id(self, entity):
         forein_entity = -1
