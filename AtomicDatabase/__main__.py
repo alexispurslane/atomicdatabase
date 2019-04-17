@@ -24,22 +24,45 @@ if len(sys.argv) > 1:
 nlp = spacy.load("en_core_web_sm")
 matcher = nl.create_matcher(nlp)
 
+search_query = {
+    "entity": "",
+    "attribute":  ""
+}
 def draw_imgui_table_database(DB):
+    global search_query
     imgui.begin("Table Database", True)
-    imgui.columns(len(DB.attributes) + 1, "TblDBAttributes")
+
+    changed, search_query["entity"] = imgui.input_text(
+        "Search Entity##search",
+        search_query["entity"],
+        256,
+        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+    )
+    changed, search_query["attribute"] = imgui.input_text(
+        "Search Attribute##search-2",
+        search_query["attribute"],
+        26,
+        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+    )
+
+    sqa = search_query["attribute"]
+    attributes = [a for a in DB.attributes if len(sqa) == 0 or (sqa in a or a in sqa)]
+    imgui.columns(len(attributes) + 1, "TblDBAttributes")
     imgui.separator()
     imgui.text("entity id")
     imgui.next_column()
-    for a in DB.attributes:
+    for a in attributes:
         imgui.text(a)
         imgui.next_column()
     imgui.separator()
 
     changes = []
-    for e in DB.entities:
+    sqe = search_query["entity"]
+    entities = [e for e in DB.entities if len(sqe) == 0 or (sqe in e or e in sqe)]
+    for e in entities:
         imgui.text(e)
         imgui.next_column()
-        for a in DB.attributes:
+        for a in attributes:
             res = DB.get_value(e, a)
             if res:
                 change = draw_eav_value(e, a, res)
@@ -82,6 +105,19 @@ def draw_eav_value(ent, att, v):
 
 def draw_imgui_eav_database(DB):
     imgui.begin("EAV Database", True)
+    changed, search_query["entity"] = imgui.input_text(
+        "Search Entity##search",
+        search_query["entity"],
+        256,
+        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+    )
+    changed, search_query["attribute"] = imgui.input_text(
+        "Search Attribute##search-2",
+        search_query["attribute"],
+        26,
+        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+    )
+
     imgui.columns(3, "EavDBAttributes")
 
     imgui.separator()
@@ -94,18 +130,21 @@ def draw_imgui_eav_database(DB):
     imgui.separator()
 
     changes = []
+    sqa = search_query["attribute"]
+    sqe = search_query["entity"]
     for (e, a, v) in DB.eavs.values():
         ent = DB.entities[e]
         att = DB.attributes[a]
-        imgui.text(ent)
-        imgui.next_column()
-        imgui.text(att)
-        imgui.next_column()
+        if (len(sqa) == 0 or (sqa in att or att in sqa)) and (len(sqe) == 0 or (sqe in ent or ent in sqe)):
+            imgui.text(ent)
+            imgui.next_column()
+            imgui.text(att)
+            imgui.next_column()
 
-        res = draw_eav_value(ent, att, v)
-        if res:
-            changes.append(res)
-        imgui.next_column()
+            res = draw_eav_value(ent, att, v)
+            if res:
+                changes.append(res)
+            imgui.next_column()
 
     for change in changes:
         DB.add(change)
