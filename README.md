@@ -66,7 +66,7 @@ My plan looks like this at the moment:
       and a table view on the other side for the actual database, and then a
       long query box at the bottom.
 - [X] Add advanced language constructs such as `cond`, unification, scope.
-- [ ] Search functions should be available for entities, attributes. Use internal query system for this, but present a nice UI.
+- [x] Search functions should be available for entities, attributes. Use internal query system for this, but present a nice UI.
 - [ ] Add metadata relational database for attributes and (optionally) entities. This metadata should include:
     * Official name
       * Range of normal (or allowed) values

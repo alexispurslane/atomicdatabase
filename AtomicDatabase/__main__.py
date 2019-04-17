@@ -347,18 +347,17 @@ def draw_imgui_database_rules(DB):
                 500,
                 300,
             )
-            if imgui.button("Done##"+uuid):
+            if imgui.button("Parse Code##"+uuid):
                 if rule_lang == 0:
                     rule_body, rule_text = eav.body(rule_text, uuid)
                 elif rule_lang == 1:
                     matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
                     rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
-            if clicked or changed or arg_changed:
-                DB.add_rule(name, rule_args, uuid, {
-                    "lang": rule_lang,
-                    "text": rule_text,
-                    "body": rule_body
-                })
+            DB.add_rule(name, rule_args, uuid, {
+                "lang": rule_lang,
+                "text": rule_text,
+                "body": rule_body
+            })
 
     for n in to_delete:
         del DB.rules[n]
@@ -387,6 +386,26 @@ def draw_imgui_database_rules(DB):
         imgui.end_popup()
     imgui.end()
 
+attr_expanded = {}
+def draw_imgui_attribute_metadata(DB):
+    global attr_expanded
+    imgui.begin("Database Attribute Editor", False)
+    for attr, metadata in DB.attribute_metadata.items():
+        attr_expanded[name], _ = imgui.collapsing_header(attr, True)
+        changed, metadata["description"] = imgui.input_text_multiline(
+            'Description##desc-' + uuid,
+            metadata["description"],
+            2056,
+            500,
+            300,
+        )
+        clicked, metadata["type"] = imgui.combo(
+            "Attribute Type##type-"+attr,
+            metadata["type"],
+            ["entity", "string", "int"]
+        )
+    imgui.end()
+
 def run():
     global DB, database_name
     font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
@@ -406,6 +425,7 @@ def run():
     show_rules_db = False
     show_save_as = False
     show_load_db = False
+    show_meta_attr = False
 
     while running:
         while SDL_PollEvent(ctypes.byref(event)) != 0:
@@ -485,13 +505,17 @@ def run():
 
             if imgui.begin_menu("Window", True):
                 _, show_eav_db = imgui.menu_item(
-                    "Show EAV Database View", selected=show_eav_db
+                    "Show EAV View", selected=show_eav_db
                 )
                 _, show_table_db = imgui.menu_item(
-                    "Show Table Database View", selected=show_table_db
+                    "Show Table View", selected=show_table_db
                 )
                 _, show_rules_db = imgui.menu_item(
-                    "Show Database Rules", selected=show_rules_db
+                    "Show Rules Editor", selected=show_rules_db
+                )
+
+                _, show_meta_attr = imgui.menu_item(
+                    "Show Attribute Metadata Editor", selected=show_meta_attr
                 )
 
                 imgui.end_menu()
@@ -551,6 +575,8 @@ def run():
             imgui.push_font(font_extra2)
             draw_imgui_database_rules(DB)
             imgui.pop_font()
+        if show_meta_attr:
+            draw_imgui_attribute_metadata(DB)
         draw_imgui_query_box(DB)
 
         imgui.pop_style_var(7)

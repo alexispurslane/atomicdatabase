@@ -252,7 +252,7 @@ def create_rule(lst, entities, uuid=None):
 
 def body(st, uuid=None):
     new_body, entities = create_text_entities("(& " + st + ")")
-    return create_rule(loads(new_body), entities, uuid), inspect.cleandoc(st)
+    return create_rule(loads(new_body), entities, uuid), st
 
 class EAVDatabase:
     def __init__(self):
@@ -261,6 +261,9 @@ class EAVDatabase:
         self.entities = []
         self.eavs = {}
         self.rules = {}
+
+    def change_attribute_metadata(self, attr, new):
+        self.attribute_metadata[attr] = new
 
     def add_rule(self, name, rule_args=[], uuid="", new_rule={
             "lang": 0,
