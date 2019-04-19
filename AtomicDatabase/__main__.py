@@ -15,6 +15,10 @@ import nl_eav_interface as nl
 from sexpdata import loads, dumps
 import spacy
 
+show_eav_db = False
+show_table_db = True
+show_rules_db = False
+show_meta_attr = False
 popup_registry = {}
 
 def draw_ok_cancel_popup(ide, message="Type a Thing:"):
@@ -55,8 +59,9 @@ search_query = {
     "attribute":  ""
 }
 def draw_imgui_table_database(DB):
-    global search_query
-    imgui.begin("Table Database", True)
+    global search_query, show_table_db
+    _, opened = imgui.begin("Table Database", True)
+    show_table_db = show_table_db and opened
 
     changed, search_query["entity"] = imgui.input_text(
         "Search Entity##search",
@@ -103,6 +108,7 @@ def draw_imgui_table_database(DB):
     imgui.end()
 
 def draw_eav_value(ent, att, v):
+    global show_eav_db
     iden = "##" + str((ent, att, v))
     if v in DB.entities:
         changed, new_entity = imgui.combo(
@@ -130,7 +136,8 @@ def draw_eav_value(ent, att, v):
     return None
 
 def draw_imgui_eav_database(DB):
-    imgui.begin("EAV Database", True)
+    _, opened = imgui.begin("EAV Database", True)
+    show_eav_db = opened
     changed, search_query["entity"] = imgui.input_text(
         "Search Entity##search",
         search_query["entity"],
@@ -312,9 +319,10 @@ def draw_imgui_query_box(DB):
 
 rule_expanded = {}
 def draw_imgui_database_rules(DB):
-    global rule_expanded
+    global rule_expanded, show_rules_db
     to_delete = []
-    imgui.begin("Database Rules", False)
+    _, opened = imgui.begin("Database Rules", True)
+    show_rules_db = opened
     for name, rule in DB.rules.items():
         rule_expanded[name], _ = imgui.collapsing_header(name, True)
 
@@ -387,8 +395,9 @@ def draw_imgui_database_rules(DB):
 
 attr_expanded = {}
 def draw_imgui_attribute_metadata(DB):
-    global attr_expanded
-    imgui.begin("Database Attribute Editor", False)
+    global attr_expanded, show_meta_attr
+    _, opened = imgui.begin("Database Attribute Editor", False)
+    show_meta_attr = opened
     for attr, metadata in DB.attribute_metadata.items():
         attr_expanded[attr], _ = imgui.collapsing_header(attr, True)
         if not attr_expanded[attr]:
@@ -444,7 +453,7 @@ def time_left(next_time):
         return next_time - now
 
 def run():
-    global DB, database_name, TICK_INTERVAL
+    global DB, database_name, TICK_INTERVAL, show_meta_attr, show_rules_db, show_eav_db, show_table_db
     font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
         "AtomicDatabase/Roboto-Light.ttf", 20
     )
@@ -457,12 +466,8 @@ def run():
     running = True
     event = SDL_Event()
 
-    show_eav_db = False
-    show_table_db = True
-    show_rules_db = False
     show_save_as = False
     show_load_db = False
-    show_meta_attr = False
 
 
     TICK_INTERVAL = 30
