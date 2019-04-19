@@ -101,17 +101,12 @@ by `pip freeze`. The main packages you have to install if you can't use the
 - spaCy and `en_core_web_sm`
     * Which you can install by doing `python -m download en_core_web_sm` after
       you've installed spaCy
-- imgui
+- `imgui[full]`
 
-I've also created a setup.py, so if you want to install Atomic Database as the
-commandline binary `atomicdb`, use:
-```
-python setup.py install
-```
+To run, use:
 
-If you're contributing, you can use:
 ```
-python setup.py develop
+python3 AtomicDatabase/__main__.py <name of database, or nothing>
 ```
 
 ## Screenshots

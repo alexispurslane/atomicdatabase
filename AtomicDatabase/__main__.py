@@ -11,8 +11,8 @@ import imgui
 
 from imgui.integrations.sdl2 import SDL2Renderer
 
-import AtomicDatabase.eav_database as eav
-import AtomicDatabase.nl_eav_interface as nl
+import eav_database as eav
+import nl_eav_interface as nl
 from sexpdata import loads, dumps
 import spacy
 
@@ -402,8 +402,49 @@ def draw_imgui_attribute_metadata(DB):
         clicked, metadata["type"] = imgui.combo(
             "Attribute Type##type-"+attr,
             metadata["type"],
-            ["entity", "string", "int"]
+            ["entity", "string", "int", "float"]
         )
+        if metadata["type"] == 2:
+            imgui.text("Leave 0s to allow an arbitrary string.")
+            changed, metadata["num_limits"] = imgui.input_int2('Int Limits##'+attr, *metadata["num_limits"])
+        elif metadata["type"] == 3:
+            imgui.text("Leave 0s to allow an arbitrary string.")
+            changed, metadata["num_limits"] = imgui.input_float2('Float Limits##'+attr, *metadata["num_limits"])
+        elif metadata["type"] == 1:
+            imgui.text("Leave blank to allow an arbitrary string.")
+            changed, strings = imgui.input_text(
+                "Allowed Strings##" + attr,
+                ','.join(metadata["allowed_strings"]),
+                26,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+            metadata["allowed_strings"] = strings.split(",")
+        elif metadata["type"] == 0:
+            imgui.text("All entities allowed")
+    if imgui.button("Add New Attribute Metadata"):
+        imgui.open_popup("new-attribute-meta")
+    if imgui.begin_popup("new-attribute-meta"):
+        imgui.text("Attribute to Add Metadata To:")
+        imgui.separator()
+        changed, new_name = imgui.input_text(
+            "##attribute-name",
+            "",
+            256,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
+        imgui.separator()
+        if changed or imgui.button("OK"):
+            if len(new_name) > 0:
+                DB.attribute_metadata[new_name] = {
+                    "description": "",
+                    "type": 0,
+                    "num_limits": (0,0),
+                    "allowed_strings": []
+                }
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            imgui.close_current_popup()
+        imgui.end_popup()
     imgui.end()
 
 def run():
