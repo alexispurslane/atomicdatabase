@@ -238,10 +238,8 @@ def draw_imgui_query_box(DB):
             256,
             imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
         )
-        if imgui.button("OK"):
-            DB.entities.append(ent_value)
-            imgui.close_current_popup()
-        if changed:
+        if changed or imgui.button("OK"):
+            print("New entity created: " + str(ent_value))
             DB.entities.append(ent_value)
             imgui.close_current_popup()
         imgui.same_line()
