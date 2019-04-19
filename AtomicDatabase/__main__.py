@@ -318,13 +318,16 @@ def draw_imgui_query_box(DB):
     imgui.end()
 
 rule_expanded = {}
+rules_changed = {}
 def draw_imgui_database_rules(DB):
     global rule_expanded, show_rules_db
     to_delete = []
     _, opened = imgui.begin("Database Rules", True)
     show_rules_db = opened
     for name, rule in DB.rules.items():
-        rule_expanded[name], _ = imgui.collapsing_header(name, True)
+        rule_expanded[name], closed = imgui.collapsing_header(name, True)
+        if not closed:
+            to_delete.append(name)
 
         if rule_expanded[name]:
             imgui.push_item_width(100)
@@ -334,8 +337,6 @@ def draw_imgui_database_rules(DB):
             rule_body = rule["body"]
             uuid = "-"+hashlib.md5(name.encode()).hexdigest()
             arg_changed = False
-            if imgui.button("Delete Rule##"+uuid):
-                to_delete.append(name)
             for i, arg in enumerate(rule_args):
                 arg = arg.split("-")[0]
                 changed, rule_args[i] = imgui.input_text(
@@ -368,7 +369,13 @@ def draw_imgui_database_rules(DB):
                 500,
                 300,
             )
+            rules_changed[name] = rules_changed.get(name, False) or changed
+            if rules_changed[name]:
+                imgui.push_text_wrap_pos()
+                imgui.text_colored("This rule has been changed. The text is saved, but if you want to save the excecutable code, click the button below.", 1, 0, 0, 0,)
+                imgui.pop_text_wrap_pos()
             if imgui.button("Save Code##"+uuid):
+                rules_changed[name] = False
                 if rule_lang == 0:
                     rule_body, rule_text = eav.body(rule_text, uuid)
                 elif rule_lang == 1:
