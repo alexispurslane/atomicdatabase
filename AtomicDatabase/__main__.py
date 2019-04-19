@@ -1,5 +1,4 @@
 import io
-import sys
 import hashlib
 import sys
 
@@ -15,6 +14,33 @@ import eav_database as eav
 import nl_eav_interface as nl
 from sexpdata import loads, dumps
 import spacy
+
+popup_registry = {}
+
+def draw_ok_cancel_popup(ide, message="Type a Thing:"):
+    if imgui.begin_popup(ide):
+        if not ide in popup_registry:
+            popup_registry[ide] = ""
+        imgui.text(message)
+        changed, popup_registry[ide] = imgui.input_text(
+            "##" + ide,
+            popup_registry[ide],
+            26,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
+        if changed or imgui.button("OK"):
+            imgui.close_current_popup()
+            val = popup_registry[ide]
+            popup_registry[ide] = ""
+            imgui.end_popup()
+            return val
+        imgui.same_line()
+        if imgui.button("Cancel"):
+            imgui.close_current_popup()
+            popup_registry[ide] = ""
+            imgui.end_popup()
+            return False
+        imgui.end_popup()
 
 database_name = "Untitled"
 DB = eav.EAVDatabase()
@@ -231,21 +257,10 @@ def draw_imgui_query_box(DB):
     if imgui.button("+##new-data"):
         imgui.open_popup("new-data")
 
-    if imgui.begin_popup("add-entity"):
-        changed, ent_value = imgui.input_text(
-            '##new-entity',
-            "",
-            256,
-            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-        )
-        if changed or imgui.button("OK"):
-            print("New entity created: " + str(ent_value))
-            DB.entities.append(ent_value)
-            imgui.close_current_popup()
-        imgui.same_line()
-        if imgui.button("Cancel"):
-            imgui.close_current_popup()
-        imgui.end_popup()
+    ent_value = draw_ok_cancel_popup("add-entity", "New Entity Name:")
+    if ent_value:
+        print("New entity created: " + str(ent_value))
+        DB.entities.append(ent_value)
 
     if imgui.begin_popup("new-data"):
         changed, data_entity = imgui.combo(
@@ -345,7 +360,7 @@ def draw_imgui_database_rules(DB):
                 500,
                 300,
             )
-            if imgui.button("Parse Code##"+uuid):
+            if imgui.button("Save Code##"+uuid):
                 if rule_lang == 0:
                     rule_body, rule_text = eav.body(rule_text, uuid)
                 elif rule_lang == 1:
@@ -364,24 +379,10 @@ def draw_imgui_database_rules(DB):
     if imgui.button("New Rule"):
         imgui.open_popup("new-rule")
 
-    if imgui.begin_popup("new-rule"):
-        imgui.text("New Rule Name:")
-        imgui.separator()
-        changed, new_name = imgui.input_text(
-            "##new-rule-name",
-            "",
-            26,
-            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-        )
-        imgui.separator()
-        if changed or imgui.button("OK"):
-            if len(new_name) > 0:
-                DB.add_rule(new_name)
-                imgui.close_current_popup()
-        imgui.same_line()
-        if imgui.button("Cancel"):
-            imgui.close_current_popup()
-        imgui.end_popup()
+    new_name = draw_ok_cancel_popup("new-rule", "New Rule Name:")
+    if new_name:
+        if len(new_name) > 0:
+            DB.add_rule(new_name.lower().replace(" ", "-"))
     imgui.end()
 
 attr_expanded = {}
@@ -423,33 +424,27 @@ def draw_imgui_attribute_metadata(DB):
             imgui.text("All entities allowed")
     if imgui.button("Add New Attribute Metadata"):
         imgui.open_popup("new-attribute-meta")
-    if imgui.begin_popup("new-attribute-meta"):
-        imgui.text("Attribute to Add Metadata To:")
-        imgui.separator()
-        changed, new_name = imgui.input_text(
-            "##attribute-name",
-            "",
-            256,
-            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-        )
-        imgui.separator()
-        if changed or imgui.button("OK"):
-            if len(new_name) > 0:
-                DB.attribute_metadata[new_name] = {
-                    "description": "",
-                    "type": 0,
-                    "num_limits": (0,0),
-                    "allowed_strings": []
-                }
-                attr_expanded[new_name] = False
-        imgui.same_line()
-        if imgui.button("Cancel"):
-            imgui.close_current_popup()
-        imgui.end_popup()
+
+    new_name = draw_ok_cancel_popup("new-attribute-meta", "Attribute Name:")
+    if new_name:
+        DB.attribute_metadata[new_name] = {
+            "description": "",
+            "type": 0,
+            "num_limits": (0,0),
+            "allowed_strings": []
+        }
+        attr_expanded[new_name] = False
     imgui.end()
 
+def time_left(next_time):
+    now = SDL_GetTicks()
+    if next_time <= now:
+        return 0
+    else:
+        return next_time - now
+
 def run():
-    global DB, database_name
+    global DB, database_name, TICK_INTERVAL
     font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
         "AtomicDatabase/Roboto-Light.ttf", 20
     )
@@ -468,6 +463,10 @@ def run():
     show_save_as = False
     show_load_db = False
     show_meta_attr = False
+
+
+    TICK_INTERVAL = 30
+    next_time = SDL_GetTicks() + TICK_INTERVAL;
 
     while running:
         while SDL_PollEvent(ctypes.byref(event)) != 0:
@@ -569,45 +568,19 @@ def run():
         if show_save_as:
             imgui.open_popup("save-as")
 
-        if imgui.begin_popup("save-as"):
-            imgui.text("Database Filename:")
-            imgui.separator()
-            changed, new_name = imgui.input_text(
-                "##database-name",
-                "",
-                26,
-                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-            )
-            if changed or imgui.button("OK"):
+        new_name = draw_ok_cancel_popup("save-as", "File Name to Save As:")
+        if not new_name is None:
+            if new_name:
                 database_name = new_name
                 eav.save_to_file(DB, database_name)
-                show_save_as = False
-                imgui.close_current_popup()
-            imgui.same_line()
-            if imgui.button("Cancel"):
-                show_save_as = False
-                imgui.close_current_popup()
-            imgui.end_popup()
+            show_save_as = False
 
-        if imgui.begin_popup("load-db"):
-            imgui.text("Database Filename:")
-            imgui.separator()
-            changed, new_name = imgui.input_text(
-                "##database-name",
-                "",
-                26,
-                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-            )
-            if changed or imgui.button("OK"):
+        new_name = draw_ok_cancel_popup("load-db", "File Name to Load:")
+        if not new_name is None:
+            if new_name:
                 database_name = new_name
                 DB = eav.load_from_file(database_name)
-                show_load_db = False
-                imgui.close_current_popup()
-            imgui.same_line()
-            if imgui.button("Cancel"):
-                show_load_db = False
-                imgui.close_current_popup()
-            imgui.end_popup()
+            show_load_db = False
 
         if show_table_db:
             draw_imgui_table_database(DB)
@@ -620,6 +593,7 @@ def run():
         if show_meta_attr:
             draw_imgui_attribute_metadata(DB)
         draw_imgui_query_box(DB)
+        imgui.show_metrics_window()
 
         imgui.pop_style_var(7)
         imgui.pop_style_color(19)
@@ -629,6 +603,9 @@ def run():
         imgui.render()
 
         SDL_GL_SwapWindow(window)
+
+        SDL_Delay(time_left(next_time))
+        next_time += TICK_INTERVAL
     renderer.shutdown()
     SDL_GL_DeleteContext(gl_context)
     SDL_DestroyWindow(window)
@@ -654,12 +631,13 @@ def impl_pysdl2_init():
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE)
 
     SDL_SetHint(SDL_HINT_MAC_CTRL_CLICK_EMULATE_RIGHT_CLICK, b"1")
-    SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, b"1")
 
     window = SDL_CreateWindow(window_name.encode('utf-8'),
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               width, height,
                               SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE)
+
+    SDL_GL_SetSwapInterval(1)
 
     if window is None:
         print("Error: Window could not be created! SDL Error: " + SDL_GetError())
