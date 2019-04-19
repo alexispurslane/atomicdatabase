@@ -255,6 +255,7 @@ def draw_imgui_query_box(DB, monospace_font):
             try:
                 matches, entities = nl.understand_predicate(nlp, matcher, query_value)
                 query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
+                query_error = ""
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
 
@@ -339,8 +340,9 @@ def draw_imgui_query_box(DB, monospace_font):
 
 rule_expanded = {}
 rules_changed = {}
+rule_error = ""
 def draw_imgui_database_rules(DB, monospaced_font):
-    global rule_expanded, show_rules_db
+    global rule_expanded, show_rules_db, rule_error
     to_delete = []
     _, opened = imgui.begin("Database Rules", True)
     show_rules_db = opened
@@ -406,16 +408,25 @@ def draw_imgui_database_rules(DB, monospaced_font):
                 imgui.pop_text_wrap_pos()
             if imgui.button("Save Code##"+uuid):
                 rules_changed[name] = False
-                if rule_lang == 0:
-                    rule_body, rule_text = eav.body(rule_text, uuid)
-                elif rule_lang == 1:
-                    matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
-                    rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
+                try:
+                    if rule_lang == 0:
+                        rule_body, rule_text = eav.body(rule_text, uuid)
+                    elif rule_lang == 1:
+                        matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
+                        rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
+                except Exception as e:
+                    rule_error = str(e)
+
             DB.add_rule(name, rule_args, uuid, {
                 "lang": rule_lang,
                 "text": rule_text,
                 "body": rule_body
             })
+
+    if len(rule_error) > 0:
+        imgui.push_font(monospaced_font)
+        imgui.text_colored("Parse Error: " + rule_error, 1, 0, 0, 1)
+        imgui.pop_font()
 
     for n in to_delete:
         del DB.rules[n]
