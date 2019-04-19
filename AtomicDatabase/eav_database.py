@@ -9,6 +9,7 @@ from sexpdata import loads, dumps, Symbol
 import copy
 import inspect
 import pickle
+import json
 
 VARIABLE   = 1
 EXPR       = 2
@@ -279,12 +280,15 @@ def body(st, uuid=None):
     return create_rule(loads(new_body), entities, uuid), st
 
 class EAVDatabase:
-    def __init__(self):
+    def __init__(self, **args):
         self.attributes = []
         self.attribute_metadata = {}
         self.entities = []
         self.eavs = {}
         self.rules = {}
+        if args != {}:
+            args["eavs"] = { float(k): v for k, v in args["eavs"].items() }
+            self.__dict__.update(args)
 
     def change_attribute_metadata(self, attr, new):
         self.attribute_metadata[attr] = new
@@ -319,7 +323,7 @@ class EAVDatabase:
         return forein_attr
 
     def add(self, eav):
-        print("New data added: " + eav)
+        print("New data added: " + str(eav))
         (entity, attr, value) = eav
         forein_entity = self.get_or_add_entity_id(entity)
         forein_attr = self.get_or_add_attribute_id(attr)
@@ -404,14 +408,14 @@ class EAVDatabase:
 
 def save_to_file(db, name):
     print("Saved to: " + name)
-    outfile = open(os.path.expanduser(os.path.expandvars(name)),'wb')
-    pickle.dump(db, outfile)
+    outfile = open(os.path.expanduser(os.path.expandvars(name)) + ".db.json",'w')
+    json.dump(db.__dict__, outfile)
     outfile.close()
 
 def load_from_file(name):
     print("Load from: " + name)
-    infile = open(os.path.expanduser(os.path.expandvars(name)),'rb')
-    db = pickle.load(infile)
+    infile = open(os.path.expanduser(os.path.expandvars(name)) + ".db.json",'r')
+    db = EAVDatabase(**json.load(infile))
     infile.close()
     return db
 

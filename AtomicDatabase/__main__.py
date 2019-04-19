@@ -3,6 +3,7 @@ import hashlib
 import sys
 
 from sdl2 import *
+from sdl2.sdlimage import *
 import ctypes
 import OpenGL.GL as gl
 
@@ -213,7 +214,7 @@ data_attr = ""
 data_type = 1
 data_value = ""
 
-def draw_imgui_query_box(DB):
+def draw_imgui_query_box(DB, monospace_font):
     global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value, query_error
 
     imgui.begin("Query...", False)
@@ -223,12 +224,16 @@ def draw_imgui_query_box(DB):
     )
     imgui.pop_item_width()
     imgui.same_line()
+    if query_language == 0:
+        imgui.push_font(monospace_font)
     changed, query_value = imgui.input_text(
         '##query-box',
         query_value,
         256,
         imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
     )
+    if query_language == 0:
+        imgui.pop_font()
 
     if query_binds == {}:
         imgui.text("The results match, but no bindings were created")
@@ -253,7 +258,10 @@ def draw_imgui_query_box(DB):
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
 
+
+    imgui.push_font(monospace_font)
     imgui.text_colored(query_error, 1, 0, 0, 1)
+    imgui.pop_font()
 
     if imgui.button("Clear"):
         imgui.open_popup("confirm")
@@ -331,13 +339,15 @@ def draw_imgui_query_box(DB):
 
 rule_expanded = {}
 rules_changed = {}
-def draw_imgui_database_rules(DB):
+def draw_imgui_database_rules(DB, monospaced_font):
     global rule_expanded, show_rules_db
     to_delete = []
     _, opened = imgui.begin("Database Rules", True)
     show_rules_db = opened
     for name, rule in DB.rules.items():
+        imgui.push_font(monospaced_font)
         rule_expanded[name], closed = imgui.collapsing_header(name, True)
+        imgui.pop_font()
         if not closed:
             to_delete.append(name)
 
@@ -349,6 +359,8 @@ def draw_imgui_database_rules(DB):
             rule_body = rule["body"]
             uuid = "-"+hashlib.md5(name.encode()).hexdigest()
             arg_changed = False
+
+            imgui.push_font(monospaced_font)
             for i, arg in enumerate(rule_args):
                 arg = arg.split("-")[0]
                 changed, rule_args[i] = imgui.input_text(
@@ -358,6 +370,7 @@ def draw_imgui_database_rules(DB):
                 )
                 arg_changed = changed or arg_changed
                 imgui.same_line()
+            imgui.pop_font()
 
             if imgui.button("+##new" + uuid):
                 rule_args.append("NewArgument")
@@ -374,6 +387,8 @@ def draw_imgui_database_rules(DB):
                 ["S-Expr", "NL"]
             )
             imgui.pop_item_width()
+            if rule_lang == 0:
+                imgui.push_font(monospaced_font)
             changed, rule_text = imgui.input_text_multiline(
                 '##body-' + uuid,
                 rule_text,
@@ -381,6 +396,9 @@ def draw_imgui_database_rules(DB):
                 500,
                 300,
             )
+            if rule_lang == 0:
+                imgui.pop_font()
+
             rules_changed[name] = rules_changed.get(name, False) or changed
             if rules_changed[name]:
                 imgui.push_text_wrap_pos()
@@ -611,12 +629,10 @@ def run():
         if show_eav_db:
             draw_imgui_eav_database(DB)
         if show_rules_db:
-            imgui.push_font(font_extra2)
-            draw_imgui_database_rules(DB)
-            imgui.pop_font()
+            draw_imgui_database_rules(DB, font_extra2)
         if show_meta_attr:
             draw_imgui_attribute_metadata(DB)
-        draw_imgui_query_box(DB)
+        draw_imgui_query_box(DB, font_extra2)
 
         imgui.pop_style_var(7)
         imgui.pop_style_color(19)
@@ -659,8 +675,6 @@ def impl_pysdl2_init():
                               SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                               width, height,
                               SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE)
-
-    SDL_GL_SetSwapInterval(1)
 
     if window is None:
         print("Error: Window could not be created! SDL Error: " + SDL_GetError())
