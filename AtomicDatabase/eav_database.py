@@ -101,9 +101,28 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
         for p in possible:
             yield from evaluate_and_rule(db, tail, p, subs)
 
+types = [
+    { "name": "OR Conjugation", "arg_count": (1, -1) },
+    { "name": "AND Conjugation", "arg_count": (1, -1) },
+    { "name": "PREDICATE", "arg_count": (3, -1) },
+    { "name": "UNIFY Command", "arg_count": (2, 2) },
+    { "name": "COMPARASON Conjugation", "arg_count": (3, 3) },
+    { "name": "CONDITION Conjugation", "arg_count": (1, -1) },
+]
+
 def evaluate_rule(db, rule, binds={}, subs={}):
+    global types
     head, *tail = rule
     print(head, tail)
+    max_args = types[head-1]["arg_count"][1]
+    min_args = types[head-1]["arg_count"][0]
+    if len(tail) < min_args:
+        raise ValueError("Not enough elements in " + types[head-1]["name"] +\
+                         "! Expected at least "+str(min_args)+", found " + str(len(tail)) + ".")
+    elif len(tail) > max_args and max_args != -1:
+        raise ValueError("Too many elements in " + types[head-1]["name"] +\
+                         "! Expected less than "+str(max_args)+", found " + str(len(tail)) + ".")
+
     if head == PREDICATE:
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
             rule = db.rules[tail[1][1]]
@@ -112,6 +131,11 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                     if tpe == VARIABLE and name in binds
                     else (tpe, name)
                     for tpe, name in tail]
+
+            if len(tail) - 1 != len(rule["args"]):
+                raise ValueError("Wrong number of arguments in " + rule["name"] +\
+                                 "! Expected "+str(len(rule["args"]))+", found " + str(len(tail)) + ".")
+
             var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
             params = var_names[:1] + var_names[2:]
             substitutions = dict(zip(rule["args"], params))

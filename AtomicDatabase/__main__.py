@@ -206,6 +206,7 @@ query_language = 1
 query_value = ""
 query_result = None
 query_binds = None
+query_error = ""
 
 data_entity = 0
 data_attr = ""
@@ -213,7 +214,7 @@ data_type = 1
 data_value = ""
 
 def draw_imgui_query_box(DB):
-    global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value
+    global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value, query_error
 
     imgui.begin("Query...", False)
     imgui.push_item_width(100)
@@ -240,10 +241,19 @@ def draw_imgui_query_box(DB):
 
     if changed:
         if query_language == 0:
-            query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds or {})
+            try:
+                query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds or {})
+                query_error = ""
+            except Exception as e:
+                query_error = "Parse Error: " + str(e)
         elif query_language ==  1:
-            matches, entities = nl.understand_predicate(nlp, matcher, query_value)
-            query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
+            try:
+                matches, entities = nl.understand_predicate(nlp, matcher, query_value)
+                query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
+            except Exception as e:
+                query_error = "Parse Error: " + str(e)
+
+    imgui.text_colored(query_error, 1, 0, 0, 1)
 
     if imgui.button("Clear"):
         imgui.open_popup("confirm")
@@ -257,6 +267,8 @@ def draw_imgui_query_box(DB):
             print("No more results")
             query_binds = None
             query_result = None
+        except Exception as e:
+            query_error = "Excecution Error: " + str(e)
 
     if imgui.button("Add New Entity"):
         imgui.open_popup("add-entity")
@@ -372,7 +384,7 @@ def draw_imgui_database_rules(DB):
             rules_changed[name] = rules_changed.get(name, False) or changed
             if rules_changed[name]:
                 imgui.push_text_wrap_pos()
-                imgui.text_colored("This rule has been changed. The text is saved, but if you want to save the excecutable code, click the button below.", 1, 0, 0, 0,)
+                imgui.text_colored("This rule has been changed. The text is saved, but if you want to save the excecutable code, click the button below.", 0, 0, 1, 1)
                 imgui.pop_text_wrap_pos()
             if imgui.button("Save Code##"+uuid):
                 rules_changed[name] = False
