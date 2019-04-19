@@ -391,9 +391,11 @@ def draw_imgui_attribute_metadata(DB):
     global attr_expanded
     imgui.begin("Database Attribute Editor", False)
     for attr, metadata in DB.attribute_metadata.items():
-        attr_expanded[name], _ = imgui.collapsing_header(attr, True)
+        attr_expanded[attr], _ = imgui.collapsing_header(attr, True)
+        if not attr_expanded[attr]:
+            continue
         changed, metadata["description"] = imgui.input_text_multiline(
-            'Description##desc-' + uuid,
+            'Description##desc-' + attr,
             metadata["description"],
             2056,
             500,
@@ -441,6 +443,7 @@ def draw_imgui_attribute_metadata(DB):
                     "num_limits": (0,0),
                     "allowed_strings": []
                 }
+                attr_expanded[new_name] = False
         imgui.same_line()
         if imgui.button("Cancel"):
             imgui.close_current_popup()
