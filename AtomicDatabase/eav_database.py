@@ -295,6 +295,7 @@ class EAVDatabase:
         return forein_attr
 
     def add(self, eav):
+        print("New data added: " + eav)
         (entity, attr, value) = eav
         forein_entity = self.get_or_add_entity_id(entity)
         forein_attr = self.get_or_add_attribute_id(attr)

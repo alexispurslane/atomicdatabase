@@ -593,7 +593,6 @@ def run():
         if show_meta_attr:
             draw_imgui_attribute_metadata(DB)
         draw_imgui_query_box(DB)
-        imgui.show_metrics_window()
 
         imgui.pop_style_var(7)
         imgui.pop_style_color(19)
