@@ -427,9 +427,11 @@ def draw_imgui_database_rules(DB, monospaced_font):
             })
 
     if len(rule_error) > 0:
+        imgui.push_text_wrap_pos()
         imgui.push_font(monospaced_font)
         imgui.text_colored("Parse Error: " + rule_error, 1, 0, 0, 1)
         imgui.pop_font()
+        imgui.pop_text_wrap_pos()
 
     for n in to_delete:
         del DB.rules[n]
