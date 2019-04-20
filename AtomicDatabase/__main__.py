@@ -370,6 +370,8 @@ def draw_imgui_database_rules(DB, monospaced_font):
                     arg,
                     26,
                 )
+                if changed and " " in rule_args[i]:
+                    rule_args[i] = rule_args[i].title().replace(" ", "")
                 arg_changed = changed or arg_changed
                 imgui.same_line()
             imgui.pop_font()
@@ -426,9 +428,11 @@ def draw_imgui_database_rules(DB, monospaced_font):
             })
 
     if len(rule_error) > 0:
+        imgui.push_text_wrap_pos()
         imgui.push_font(monospaced_font)
         imgui.text_colored("Parse Error: " + rule_error, 1, 0, 0, 1)
         imgui.pop_font()
+        imgui.pop_text_wrap_pos()
 
     for n in to_delete:
         del DB.rules[n]
