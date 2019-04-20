@@ -370,6 +370,8 @@ def draw_imgui_database_rules(DB, monospaced_font):
                     arg,
                     26,
                 )
+                if changed and " " in rule_args[i]:
+                    rule_args[i] = rule_args[i].title().replace(" ", "")
                 arg_changed = changed or arg_changed
                 imgui.same_line()
             imgui.pop_font()
