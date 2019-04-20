@@ -298,6 +298,7 @@ def draw_imgui_query_box(DB, monospace_font):
             data_attr,
             256,
         )
+        data_attr = data_attr.lower().replace(" ", "_")
         changed, data_type = imgui.combo(
             "Value Type##data-type", data_type, ['int', 'string']
         )
@@ -438,7 +439,7 @@ def draw_imgui_database_rules(DB, monospaced_font):
     new_name = draw_ok_cancel_popup("new-rule", "New Rule Name:")
     if new_name:
         if len(new_name) > 0:
-            DB.add_rule(new_name.lower().replace(" ", "-"))
+            DB.add_rule(new_name.lower().replace(" ", "_"))
     imgui.end()
 
 attr_expanded = {}
@@ -484,6 +485,7 @@ def draw_imgui_attribute_metadata(DB):
 
     new_name = draw_ok_cancel_popup("new-attribute-meta", "Attribute Name:")
     if new_name:
+        new_name = new_name.lower().replace(" ", "_")
         DB.attribute_metadata[new_name] = {
             "description": "",
             "type": 0,
