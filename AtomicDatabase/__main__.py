@@ -207,6 +207,7 @@ query_value = ""
 query_result = None
 query_binds = None
 query_error = ""
+new_query_result = False
 
 data_entity = 0
 data_attr = ""
@@ -214,7 +215,7 @@ data_type = 1
 data_value = ""
 
 def draw_imgui_query_box(DB, monospace_font):
-    global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value, query_error
+    global query_language, query_value, query_result, query_binds, data_entity, data_attr, data_type, data_value, query_error, new_query_result
 
     imgui.begin("Query...", False)
     imgui.push_item_width(100)
@@ -248,15 +249,19 @@ def draw_imgui_query_box(DB, monospace_font):
             try:
                 query_result = eav.evaluate_rule(DB, eav.body(query_value)[0], query_binds or {})
                 query_error = ""
+                new_query_result = True
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
+                new_query_result = False
         elif query_language ==  1:
             try:
                 matches, entities = nl.understand_predicate(nlp, matcher, query_value)
                 query_result = eav.evaluate_rule(DB, nl.convert_nlast_to_rules(matches, entities), query_binds or {})
                 query_error = ""
+                new_query_result = True
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
+                new_query_result = False
 
 
     imgui.push_font(monospace_font)
@@ -266,7 +271,8 @@ def draw_imgui_query_box(DB, monospace_font):
     if imgui.button("Clear"):
         imgui.open_popup("confirm")
     imgui.same_line()
-    if imgui.button("Next") and query_result:
+    if imgui.button("Next") and query_result or new_query_result:
+        new_query_result = False
         print("--- NEXT")
         try:
             query_binds = next(query_result)
@@ -298,7 +304,7 @@ def draw_imgui_query_box(DB, monospace_font):
             data_attr,
             256,
         )
-        data_attr = data_attr.lower().replace(" ", "_")
+        data_attr = data_attr.lower().replace(" ", "_").replace("-", "_")
         changed, data_type = imgui.combo(
             "Value Type##data-type", data_type, ['int', 'string']
         )
@@ -444,7 +450,7 @@ def draw_imgui_database_rules(DB, monospaced_font):
     new_name = draw_ok_cancel_popup("new-rule", "New Rule Name:")
     if new_name:
         if len(new_name) > 0:
-            DB.add_rule(new_name.lower().replace(" ", "_"))
+            DB.add_rule(new_name.lower().replace(" ", "_").replace("-", "_"))
     imgui.end()
 
 attr_expanded = {}
@@ -490,7 +496,7 @@ def draw_imgui_attribute_metadata(DB):
 
     new_name = draw_ok_cancel_popup("new-attribute-meta", "Attribute Name:")
     if new_name:
-        new_name = new_name.lower().replace(" ", "_")
+        new_name = new_name.lower().replace(" ", "_").replace("-", "_")
         DB.attribute_metadata[new_name] = {
             "description": "",
             "type": 0,
