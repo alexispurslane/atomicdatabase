@@ -236,11 +236,11 @@ def draw_imgui_query_box(DB, monospace_font):
         imgui.pop_font()
 
     if query_binds == {}:
-        imgui.text("The results match, but no bindings were created")
+        imgui.text_colored("The results match, but no bindings were created", 0, 1, 0, 1)
     elif query_binds:
         draw_query(query_binds)
     elif query_binds is None and query_result:
-        imgui.text("Bindings empty but backtracker still present. Try clicking 'Next'")
+        imgui.text_colored("Bindings empty but backtracker still present. Try clicking 'Next'", 0, 0, 1, 1)
     else:
         imgui.text("No results")
 

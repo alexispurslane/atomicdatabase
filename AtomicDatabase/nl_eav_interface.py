@@ -6,6 +6,19 @@ from spacy.matcher import Matcher
 
 import re
 
+from io import StringIO
+import sys
+
+class Capturing(list):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        del self._stringio    # free up some memory
+        sys.stdout = self._stdout
+
 PATTERNS = {
     "ReversePredicate": [
         {'DEP': 'nsubj'},
@@ -16,11 +29,11 @@ PATTERNS = {
         {'DEP': 'pobj'},
     ],
     "PredicateContraction": [
-        {'POS': {'IN': ['NOUN', 'PROPN']}},
+        {'DEP': 'poss'},
         {'POS': 'PART', 'OP': '?'},
         {'DEP': 'nsubj'},
         {'LEMMA': 'be'},
-        {'DEP': 'attr'}
+        {'DEP': {'IN': ['attr', 'acomp']}}
     ],
     "Predicate": [
         {'POS': 'DET', 'OP': '*'},
@@ -28,7 +41,7 @@ PATTERNS = {
         {'DEP': 'prep'},
         {'DEP': 'pobj'},
         {'LEMMA': 'be'},
-        {'DEP': 'attr'},
+        {'DEP': {'IN': ['attr', 'acomp']}},
     ],
     "SimpleQuery": [
         {'TAG': 'WP'},
@@ -36,6 +49,29 @@ PATTERNS = {
         {'DEP': 'poss'},
         {'POS': 'PART', 'OP': '?'},
         {'IS_ASCII': True, 'IS_SPACE': False}
+    ],
+    "ReverseSimpleQuery": [
+        {'TAG': 'WP'},
+        {'LEMMA': 'be'},
+        {'DEP': 'det'},
+        {'DEP': 'nsubj'},
+        {'DEP': 'prep'},
+        {'DEP': 'pobj'}
+    ],
+    "FindEntitySimpleQuery": [
+        {'TAG': 'WP'},
+        {'LEMMA': 'have'},
+        {'DEP': 'det'},
+        {'DEP': 'dobj'},
+        {'DEP': 'prep'},
+        {'DEP': 'pobj'}
+    ],
+    "FindEntitySimpleQueryContraction": [
+        {'TAG': 'WP'},
+        {'LEMMA': 'be'},
+        {'DEP': 'attr'},
+        {'LEMMA': 'be'},
+        {'DEP': {'IN': ['attr', 'ROOT']}}
     ]
 }
 
@@ -123,7 +159,9 @@ def run_nlp(constarg, string):
     if len(mat) > 0:
         return mat[-1]
     else:
-        return string
+        with Capturing() as output:
+            pos_printer(doc)
+        raise ValueError("Can't recognize sentence '" + string + "' with format: \n" + "\n".join(output))
 
 def understand_predicate(nlp, matcher, string):
     string, entities = create_text_entities(string)
@@ -163,18 +201,16 @@ def convert_match_to_rule(consts, match):
     global RULE_IDS
     if isinstance(match, tuple):
         (pattern, lst) = match
+        print(pattern, lst)
         (entity, attribute, value) = (None, None, None)
         if pattern == 'SimpleQuery':
             entity = [x.text for x in lst if x.dep_ == 'poss']
-            attribute = [x.text for x in lst if x.pos_ != 'PUNCT']
-            return [eav_database.PREDICATE,
-                    create_type(entity[0], entities, uuid),
-                    create_type(attribute[-1], entities, uuid),
-                    (eav_database.VARIABLE, 'Result')]
-        elif pattern == 'PredicateContraction':
-            entity    = [x.text for x in lst if x.pos_ in ['NOUN', 'PROPN']]
             attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value     = [x.text for x in lst if x.dep_ == 'attr']
+            value = ['Result']
+        elif pattern == 'PredicateContraction':
+            entity    = [x.text for x in lst if x.dep_ == 'poss']
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
+            value     = [x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'acomp']
         elif pattern == 'ReversePredicate':
             entity    = [x.text for x in lst if x.dep_ == 'pobj']
             attribute = [x.text for x in lst if x.dep_ == 'attr']
@@ -182,7 +218,19 @@ def convert_match_to_rule(consts, match):
         elif pattern == 'Predicate':
             entity    = [x.text for x in lst if x.dep_ == 'pobj']
             attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value     = [x.text for x in lst if x.dep_ == 'attr']
+            value     = [x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'acomp']
+        elif pattern == 'ReverseSimpleQuery':
+            entity    = [x.text for x in lst if x.dep_ == 'pobj']
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
+            value = ['Result']
+        elif pattern == 'FindEntitySimpleQuery':
+            entity    = ['Result']
+            attribute = [x.text for x in lst if x.dep_ == 'dobj']
+            value = [x.text for x in lst if x.dep_ == 'pobj']
+        elif pattern == 'FindEntitySimpleQueryContraction':
+            entity    = ['Result']
+            attribute = [[x.text for x in lst if x.dep_ == 'attr'][0]]
+            value = [[x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'ROOT'][2]]
 
         if entity != None and attribute != None and value != None:
             args = [entity, attribute, value]
