@@ -3,7 +3,6 @@ import hashlib
 import sys
 
 from sdl2 import *
-from sdl2.sdlimage import *
 import ctypes
 import OpenGL.GL as gl
 
@@ -414,6 +413,7 @@ def draw_imgui_database_rules(DB, monospaced_font):
                     elif rule_lang == 1:
                         matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
                         rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
+                    rule_error = ""
                 except Exception as e:
                     rule_error = str(e)
 
@@ -521,6 +521,7 @@ def run():
     TICK_INTERVAL = 30
     next_time = SDL_GetTicks() + TICK_INTERVAL;
 
+    io = imgui.get_io()
     while running:
         while SDL_PollEvent(ctypes.byref(event)) != 0:
             if event.type == SDL_QUIT:
