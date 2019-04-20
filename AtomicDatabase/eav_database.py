@@ -408,13 +408,13 @@ class EAVDatabase:
 
 def save_to_file(db, name):
     print("Saved to: " + name)
-    outfile = open(os.path.expanduser(os.path.expandvars(name)) + ".db.json",'w')
+    outfile = open(os.path.expanduser(os.path.expandvars(name)),'w')
     json.dump(db.__dict__, outfile)
     outfile.close()
 
 def load_from_file(name):
     print("Load from: " + name)
-    infile = open(os.path.expanduser(os.path.expandvars(name)) + ".db.json",'r')
+    infile = open(os.path.expanduser(os.path.expandvars(name)),'r')
     db = EAVDatabase(**json.load(infile))
     infile.close()
     return db
