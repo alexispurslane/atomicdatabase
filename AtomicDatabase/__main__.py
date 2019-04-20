@@ -381,7 +381,8 @@ def draw_imgui_database_rules(DB, monospaced_font):
                 arg_changed = True
             imgui.same_line()
             if imgui.button("-##del" + uuid):
-                del rule_args[-1]
+                if len(rule_args) != 0:
+                    del rule_args[-1]
                 arg_changed = True
             imgui.same_line()
 
