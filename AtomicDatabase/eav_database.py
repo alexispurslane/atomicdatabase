@@ -93,6 +93,7 @@ def evaluate_cond_rule(db, branches, binds={}, subs={}):
         ret = evaluate_rule(db, head, binds, subs)
         try:
             fst = next(ret)
+            print("RESULT: " + str(fst))
             yield from chain([fst], ret)
         except StopIteration:
             print("No stuff")

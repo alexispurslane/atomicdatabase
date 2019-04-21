@@ -54,7 +54,7 @@ PATTERNS = {
         {'TAG': 'WP'},
         {'LEMMA': 'be'},
         {'DEP': 'det'},
-        {'DEP': 'nsubj'},
+        {'DEP': {'IN': ['nsubj', 'attr']}},
         {'DEP': 'prep'},
         {'DEP': 'pobj'}
     ],
