@@ -318,28 +318,45 @@ def draw_imgui_query_box(DB, monospace_font):
         )
         data_attr = data_attr.lower().replace(" ", "_").replace("-", "_")
         changed, data_type = imgui.combo(
-            "Value Type##data-type", data_type, ['int', 'string']
+            "Value Type##data-type", data_type, DB.type_name
         )
-        if changed and data_type == 0:
+        if changed and (data_type == 2 or data_type == 3 or data_type == 0):
             data_value = 0
         elif changed and data_type == 1:
             data_value = ""
         if data_type == 0:
-            changed, data_value = imgui.input_int(
-                "Value##data-value-int",
-                data_value
+            changed, data_value = imgui.combo(
+                "Value##data-value-entity",
+                data_value,
+                DB.entities
             )
-        else:
+        elif data_type == 1:
             changed, data_value = imgui.input_text(
                 'Value##data-value-string',
                 data_value,
                 256,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
             )
+        elif data_type == 2:
+            changed, data_value = imgui.input_int(
+                'Value##data-value-int',
+                data_value
+            )
+        elif data_type == 3:
+            changed, data_value = imgui.input_float(
+                'Value##data-value-float',
+                data_value
+            )
         if imgui.button("OK") or imgui.get_io().keys_down[SDL_SCANCODE_RETURN]:
             try:
+                if data_type == 0:
+                    data_value = DB.entities[data_value]
                 DB.add((DB.entities[data_entity], data_attr, data_value))
                 query_error = ""
+                data_entity = 0
+                data_attr = ""
+                data_type = 1
+                data_value = ""
                 imgui.close_current_popup()
             except ValueError as e:
                 query_error = "Data Error: " + str(e)
@@ -504,7 +521,7 @@ def draw_imgui_attribute_metadata(DB):
                 26,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
             )
-            metadata["allowed_strings"] = strings.split(",")
+            metadata["allowed_strings"] = list(filter(lambda x: len(x), strings.split(",")))
         elif metadata["type"] == 0:
             imgui.text("All entities allowed")
     if imgui.button("Add New Attribute Metadata"):

@@ -343,13 +343,17 @@ class EAVDatabase:
         if attr in self.attribute_metadata:
             data = self.attribute_metadata[attr]
 
+            print(data["allowed_strings"])
             is_ok = data["type"] == 0 and (value in self.entities) or\
-                data["type"] == 1 and isinstance(value, str) and (value in data["allowed_strings"] or\
+                data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
+                                                                  value in data["allowed_strings"] or\
                                                                   len(data["allowed_strings"]) == 0) or\
                 (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
 
             custom_message = ""
-            if data["num_limits"]:
+            if data["type"] == 0:
+                custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
+            elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
                 custom_message = " between " + str(data["num_limits"][0]) + " and " +\
                     str(data["num_limits"][1]) + " (inclusive)"
             elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
