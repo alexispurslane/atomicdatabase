@@ -67,19 +67,19 @@ My plan looks like this at the moment:
       long query box at the bottom.
 - [X] Add advanced language constructs such as `cond`, unification, scope.
 - [x] Search functions should be available for entities, attributes. Use internal query system for this, but present a nice UI.
-- [ ] Add metadata relational database for attributes and (optionally) entities. This metadata should include:
+- [X] Add metadata relational database for attributes and (optionally) entities. This metadata should include:
     * Official name
       * Range of normal (or allowed) values
       * Data type
       * Description
       * (Auto generated) used by entities
-- [ ] Use metadata to display UI elements in the database view
-- [ ] Add validation and type-checking warnings (or errors!) to language and UI
+- [X] Use metadata to display UI elements in the database view
+- [X] Add validation and type-checking warnings (or errors!) to language and UI
 - [ ] Add automatic conversion to a relational database for export
-- [ ] Create a separate entity type to validate with, instead of strings
+- [X] Create a separate entity type to validate with, instead of strings
+- [X] Focus on adding more variety to the NL recognizer
 - [ ] Extend the natural language interface to support some (all if possible!)
       advanced language constructs
-- [ ] Focus on adding more variety to the NL recognizer
 - [ ] Create a chatbot (or "repl") interface for adding data and querying the
       database, where the history of your bindings and queries is interactable
       inline in the transcript, and when you click next on any result, the
@@ -88,7 +88,7 @@ My plan looks like this at the moment:
       turned into regular text at the user's convenience.
 - [ ] Create a way to externally save and load plain-test rules and query
       transcripts
-- [ ] Allow saving and loading of the database in plaintext
+- [X] Allow saving and loading of the database in plaintext
 - [ ] Create a method of making UI elements and interfaces from inside rules
      (perhaps a main `createGUI` rule?)
 
