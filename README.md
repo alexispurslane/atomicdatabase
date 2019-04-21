@@ -1,6 +1,6 @@
 # Atomic Database 2.0
 
-![Main Screenshot](Screenshots/2019-04-15-193029_2560x1440_scrot.png)
+![Main Screenshot](Screenshots/2019-04-21-144353_1920x1080_scrot.png)
 
 ## What is Atomic Database
 
