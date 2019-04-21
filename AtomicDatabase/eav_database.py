@@ -105,7 +105,7 @@ def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
 types = [
     { "name": "OR Conjugation", "arg_count": (1, -1) },
     { "name": "AND Conjugation", "arg_count": (1, -1) },
-    { "name": "PREDICATE", "arg_count": (3, -1) },
+    { "name": "PREDICATE or RULE", "arg_count": (2, -1) },
     { "name": "UNIFY Command", "arg_count": (2, 2) },
     { "name": "COMPARASON Conjugation", "arg_count": (3, 3) },
     { "name": "CONDITION Conjugation", "arg_count": (1, -1) },
@@ -123,10 +123,11 @@ def evaluate_rule(db, rule, binds={}, subs={}):
     elif len(tail) > max_args and max_args != -1:
         raise ValueError("Too many elements in " + types[head-1]["name"] +\
                          "! Expected less than "+str(max_args)+", found " + str(len(tail)) + ".")
-
     if head == PREDICATE:
+        was_rule = False
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
             rule = db.rules[tail[1][1]]
+            was_rule = True
 
             tail = [(LITERAL, binds[name])
                     if tpe == VARIABLE and name in binds
@@ -160,27 +161,32 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                         output_binds[key] = value
 
                 yield output_binds
-        elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
-            res = db.get_value(tail[0][1], tail[1][1])
-            if res:
-                new_binds = copy.copy(binds)
-                new_binds[tail[2][1]] = res
-                yield new_binds
-        elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
-            res = db.get_value(tail[0][1], tail[1][1])
-            if res and res == tail[2][1]:
-                yield binds
-            elif not res:
-                db.add((tail[0][1], tail[1][1], tail[2][1]))
-                yield binds
-        else:
-            for (e, a, v) in db.eavs.values():
-                eav_rule = [(LITERAL, db.entities[e]),
-                            (LITERAL, db.attributes[a]),
-                            (LITERAL, v)]
-                res = unify(tail, eav_rule, copy.copy(binds))
-                if res != None:
-                    yield res
+
+        if not was_rule:
+            if len(tail) < 3:
+                raise ValueError("Not enough elements in PREDICATE" + \
+                                 "! Expected at least 3, found " + str(len(tail)) + ".")
+            if tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
+                res = db.get_value(tail[0][1], tail[1][1])
+                if res:
+                    new_binds = copy.copy(binds)
+                    new_binds[tail[2][1]] = res
+                    yield new_binds
+            elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
+                res = db.get_value(tail[0][1], tail[1][1])
+                if res and res == tail[2][1]:
+                    yield binds
+                elif not res:
+                    db.add((tail[0][1], tail[1][1], tail[2][1]))
+                    yield binds
+            else:
+                for (e, a, v) in db.eavs.values():
+                    eav_rule = [(LITERAL, db.entities[e]),
+                                (LITERAL, db.attributes[a]),
+                                (LITERAL, v)]
+                    res = unify(tail, eav_rule, copy.copy(binds))
+                    if res != None:
+                        yield res
     elif head == CONJ_COMP:
         op, *args = tail
         vals = [binds[e[1]] if e[0] == VARIABLE and e[1] in binds else e[1] for e in args]
