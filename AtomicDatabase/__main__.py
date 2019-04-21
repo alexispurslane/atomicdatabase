@@ -97,7 +97,7 @@ def draw_imgui_table_database(DB):
         for a in attributes:
             res = DB.get_value(e, a)
             if res:
-                change = draw_eav_value(e, a, res)
+                change = draw_eav_value(DB, e, a, res)
                 if change:
                     changes.append(change)
             else:
@@ -113,24 +113,25 @@ def draw_imgui_table_database(DB):
     imgui.text_colored(table_error, 1, 0, 0, 1)
     imgui.end()
 
-def draw_eav_value(ent, att, v):
+def draw_eav_value(DB, ent, att, v):
     global show_eav_db
     iden = "##" + str((ent, att, v))
-    if v in DB.entities:
+    metadata = DB.attribute_metadata.get(att)
+    if (metadata and metadata["type"] == 0) or (not metadata and v in DB.entities):
         changed, new_entity = imgui.combo(
             iden, DB.entities.index(v), DB.entities
         )
         if changed:
             return (ent, att, DB.entities[new_entity])
-    elif isinstance(v, int):
+    elif (metadata and metadata["type"] == 2) or (not metadata and isinstance(v, int)):
         changed, new_value = imgui.input_int(iden, v)
         if changed:
             return (ent, att, new_value)
-    elif isinstance(v, float):
+    elif (metadata and metadata["type"] == 3) or (not metadata and isinstance(v, float)):
         changed, new_value = imgui.input_float(iden, v)
         if changed:
             return (ent, att, new_value)
-    elif isinstance(v, str):
+    elif (metadata and metadata["type"] == 1) or (not metadata and isinstance(v, str)):
         changed, new_value = imgui.input_text(
             iden,
             v,
@@ -139,6 +140,13 @@ def draw_eav_value(ent, att, v):
         )
         if changed:
             return (ent, att, new_value)
+    if imgui.is_item_hovered() and metadata:
+        imgui.begin_tooltip()
+        imgui.text_colored("Type: ", 0, 0, 1, 1)
+        imgui.same_line()
+        imgui.text(DB.type_name[metadata["type"]])
+        imgui.text(metadata["description"])
+        imgui.end_tooltip()
     return None
 
 def draw_imgui_eav_database(DB):
@@ -181,7 +189,7 @@ def draw_imgui_eav_database(DB):
             imgui.text(att)
             imgui.next_column()
 
-            res = draw_eav_value(ent, att, v)
+            res = draw_eav_value(DB, ent, att, v)
             if res:
                 changes.append(res)
             imgui.next_column()
