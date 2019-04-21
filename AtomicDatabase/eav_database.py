@@ -23,6 +23,11 @@ UNIFY      = 4
 CONJ_COMP  = 5
 CONJ_COND  = 6
 
+def between_limits(value, limits):
+    (a,b) = limits
+    print(value, a, b)
+    return (value >= a or a == -1) and (value <= b or b == -1)
+
 def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
 
@@ -135,8 +140,8 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                     for tpe, name in tail]
 
             if len(tail) - 1 != len(rule["args"]):
-                raise ValueError("Wrong number of arguments in " + rule["name"] +\
-                                 "! Expected "+str(len(rule["args"]))+", found " + str(len(tail)) + ".")
+                raise ValueError("Wrong number of arguments in " + rule["name"].upper() +\
+                                 " Rule! Expected "+str(len(rule["args"]))+", found " + str(len(tail)) + ".")
 
             var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
             params = var_names[:1] + var_names[2:]
@@ -292,6 +297,7 @@ class EAVDatabase:
         self.entities = []
         self.eavs = {}
         self.rules = {}
+        self.type_name = ["entity", "string", "int", "float"]
         if args != {}:
             args["eavs"] = { float(k): v for k, v in args["eavs"].items() }
             self.__dict__.update(args)
@@ -333,6 +339,25 @@ class EAVDatabase:
         (entity, attr, value) = eav
         forein_entity = self.get_or_add_entity_id(entity)
         forein_attr = self.get_or_add_attribute_id(attr)
+
+        if attr in self.attribute_metadata:
+            data = self.attribute_metadata[attr]
+
+            is_ok = data["type"] == 0 and (value in self.entities) or\
+                data["type"] == 1 and isinstance(value, str) and (value in data["allowed_strings"] or\
+                                                                  len(data["allowed_strings"]) == 0) or\
+                (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
+
+            custom_message = ""
+            if data["num_limits"]:
+                custom_message = " between " + str(data["num_limits"][0]) + " and " +\
+                    str(data["num_limits"][1]) + " (inclusive)"
+            elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
+                custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
+
+            if not is_ok:
+                raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
+                                self.type_name[data["type"]] + custom_message + ", got: " + str(value) + ".")
 
         self.eavs[eav_hash(forein_entity, forein_attr)] = (forein_entity, forein_attr, value)
 

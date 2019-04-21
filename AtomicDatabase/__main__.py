@@ -53,13 +53,14 @@ if len(sys.argv) > 1:
     database_name = sys.argv[1]
 nlp = spacy.load("en_core_web_sm")
 matcher = nl.create_matcher(nlp)
+table_error = ""
 
 search_query = {
     "entity": "",
     "attribute":  ""
 }
 def draw_imgui_table_database(DB):
-    global search_query, show_table_db
+    global search_query, show_table_db, table_error
     _, opened = imgui.begin("Table Database", True)
     show_table_db = show_table_db and opened
 
@@ -103,8 +104,13 @@ def draw_imgui_table_database(DB):
                 imgui.text("<N/A>")
             imgui.next_column()
     for change in changes:
-        DB.add(change)
+        try:
+            DB.add(change)
+            table_error = ""
+        except ValueError as e:
+            table_error = "Data Error: " + str(e)
     imgui.columns(1)
+    imgui.text_colored(table_error, 1, 0, 0, 1)
     imgui.end()
 
 def draw_eav_value(ent, att, v):
@@ -136,6 +142,7 @@ def draw_eav_value(ent, att, v):
     return None
 
 def draw_imgui_eav_database(DB):
+    global table_error
     _, opened = imgui.begin("EAV Database", True)
     show_eav_db = opened
     changed, search_query["entity"] = imgui.input_text(
@@ -180,9 +187,14 @@ def draw_imgui_eav_database(DB):
             imgui.next_column()
 
     for change in changes:
-        DB.add(change)
+        try:
+            DB.add(change)
+            table_error = ""
+        except ValueError as e:
+            table_error = "Data Error: " + str(e)
 
     imgui.columns(1)
+    imgui.text_colored(table_error, 1, 0, 0, 1)
     imgui.end()
 
 def draw_query(binds):
@@ -324,9 +336,13 @@ def draw_imgui_query_box(DB, monospace_font):
                 256,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
             )
-        if imgui.button("OK"):
-            DB.add((DB.entities[data_entity], data_attr, data_value))
-            imgui.close_current_popup()
+        if imgui.button("OK") or imgui.get_io().keys_down[SDL_SCANCODE_RETURN]:
+            try:
+                DB.add((DB.entities[data_entity], data_attr, data_value))
+                query_error = ""
+                imgui.close_current_popup()
+            except ValueError as e:
+                query_error = "Data Error: " + str(e)
         imgui.same_line()
         if imgui.button("Cancel"):
             imgui.close_current_popup()
@@ -472,13 +488,13 @@ def draw_imgui_attribute_metadata(DB):
         clicked, metadata["type"] = imgui.combo(
             "Attribute Type##type-"+attr,
             metadata["type"],
-            ["entity", "string", "int", "float"]
+            DB.type_name
         )
         if metadata["type"] == 2:
-            imgui.text("Leave 0s to allow an arbitrary string.")
+            imgui.text("Leave -1s to allow an arbitrary string.")
             changed, metadata["num_limits"] = imgui.input_int2('Int Limits##'+attr, *metadata["num_limits"])
         elif metadata["type"] == 3:
-            imgui.text("Leave 0s to allow an arbitrary string.")
+            imgui.text("Leave -1s to allow an arbitrary string.")
             changed, metadata["num_limits"] = imgui.input_float2('Float Limits##'+attr, *metadata["num_limits"])
         elif metadata["type"] == 1:
             imgui.text("Leave blank to allow an arbitrary string.")
