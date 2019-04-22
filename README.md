@@ -79,6 +79,8 @@ My plan looks like this at the moment:
 - [X] Add list support to attribute metadata
 - [ ] Typecheck list internals properly
 - [ ] Add immediate functions and list descturing
+- [ ] Remove dynamic and static scope implementations and use lexical scope based on where things are defined. Make sure nested function calls only get data from their input variables. Create an optional way to access global variables
+- [ ] Make sure rules can call themselves, and check that unification works for recursive functions. Provide a way to iterate through using list destructuring
 - [ ] Add automatic conversion to a relational database for export
 - [X] Create a separate entity type to validate with, instead of strings
 - [X] Focus on adding more variety to the NL recognizer
