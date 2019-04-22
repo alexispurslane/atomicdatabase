@@ -1,6 +1,7 @@
 import io
 import hashlib
 import sys
+import copy
 
 from sdl2 import *
 import ctypes
@@ -113,49 +114,57 @@ def draw_imgui_table_database(DB):
     imgui.text_colored(table_error, 1, 0, 0, 1)
     imgui.end()
 
+is_unfolded = {}
 def draw_eav_value(DB, ent, att, v, metadata={}):
-    global show_eav_db
+    global show_eav_db, is_unfolded
     iden = "##" + str((ent, att, v))
-    metadata = DB.attribute_metadata.get(att)
-    if (metadata and metadata["type"] == 0) or (not metadata and v in DB.entities):
-        changed, new_entity = imgui.combo(
-            iden, DB.entities.index(v), DB.entities
-        )
-        if changed:
-            return (ent, att, DB.entities[new_entity])
-    elif (metadata and metadata["type"] == 2) or (not metadata and isinstance(v, int)):
-        changed, new_value = imgui.input_int(iden, v)
-        if changed:
-            return (ent, att, new_value)
-    elif (metadata and metadata["type"] == 3) or (not metadata and isinstance(v, float)):
-        changed, new_value = imgui.input_float(iden, v)
-        if changed:
-            return (ent, att, new_value)
-    elif (metadata and metadata["type"] == 1) or (not metadata and isinstance(v, str)):
-        changed, new_value = imgui.input_text(
-            iden,
-            v,
-            256,
-            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-        )
-        if changed:
-            return (ent, att, new_value)
-    elif (metadata and metadata["is_list"]) or (not metadata and isinstance(v, list)):
-        changes = {}
-        new_md = None
-        if metadata and metadata.get("type"):
-            new_md = { "type": metadata["type"] }
-        for i, (lab, val) in enumerate(v):
-            change = draw_eav_value(DB, ent, att + "-" + str(i), val, new_md)
-            if change:
-                changes[i] = (lab, change)
-        for i, val in changes.items():
-            v[i] = val
+    metadata = metadata or DB.attribute_metadata.get(att)
+    try:
+        if (metadata and metadata.get("is_list")) or (not metadata and isinstance(v, list)):
+            if not is_unfolded.get(iden):
+                is_unfolded[iden] = False
+            is_unfolded[iden], visible = imgui.collapsing_header("Show List", True)
+            if is_unfolded[iden]:
+                new_md = copy.copy(metadata)
+                new_md["is_list"] = False
+                for i, (lab, val) in enumerate(v):
+                    change = draw_eav_value(DB, ent, att, val, new_md)
+                    if change:
+                        v[i] = [lab, change[2]]
+        elif (metadata and metadata["type"] == 0) or (not metadata and v in DB.entities):
+            changed, new_entity = imgui.combo(
+                iden, DB.entities.index(v), DB.entities
+            )
+            if changed:
+                return (ent, att, DB.entities[new_entity])
+        elif (metadata and metadata["type"] == 2) or (not metadata and isinstance(v, int)):
+            changed, new_value = imgui.input_int(iden, v)
+            if changed:
+                return (ent, att, new_value)
+        elif (metadata and metadata["type"] == 3) or (not metadata and isinstance(v, float)):
+            changed, new_value = imgui.input_float(iden, v)
+            if changed:
+                return (ent, att, new_value)
+        elif (metadata and metadata["type"] == 1) or (not metadata and isinstance(v, str)):
+            changed, new_value = imgui.input_text(
+                iden,
+                v,
+                256,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+            if changed:
+                return (ent, att, new_value)
+    except Exception as e:
+        print("Error: " + str(e))
+        imgui.text_colored(str(v), 1, 0, 0, 1)
     if imgui.is_item_hovered() and metadata:
         imgui.begin_tooltip()
         imgui.text_colored("Type: ", 0, 0, 1, 1)
         imgui.same_line()
-        imgui.text(DB.type_name[metadata["type"]])
+        descriptor = ""
+        if metadata.get("is_list"):
+            descriptor = "list"
+        imgui.text(DB.type_name[metadata["type"]] + " " + descriptor)
         imgui.text(metadata["description"])
         imgui.end_tooltip()
     return None
@@ -558,7 +567,7 @@ def draw_imgui_attribute_metadata(DB):
         new_name = new_name.lower().replace(" ", "_").replace("-", "_")
         DB.attribute_metadata[new_name] = {
             "description": "",
-            "type": 1,
+            "type": 5,
             "num_limits": (0,0),
             "is_list": False,
             "allowed_strings": []

@@ -389,7 +389,6 @@ class EAVDatabase:
         if attr in self.attribute_metadata:
             data = self.attribute_metadata[attr]
 
-            print(data["allowed_strings"])
             is_ok = data["type"] == 0 and (value in self.entities) or\
                 data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
                                                                   value in data["allowed_strings"] or\
