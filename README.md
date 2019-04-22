@@ -75,8 +75,9 @@ My plan looks like this at the moment:
       * (Auto generated) used by entities
 - [X] Use metadata to display UI elements in the database view
 - [X] Add validation and type-checking warnings (or errors!) to language and UI
-- [ ] Add automatic conversion to a relational database for export
 - [ ] Add lists and immediate functions to SEL.
+- [ ] Add list support to attribute metadata
+- [ ] Add automatic conversion to a relational database for export
 - [X] Create a separate entity type to validate with, instead of strings
 - [X] Focus on adding more variety to the NL recognizer
 - [ ] Extend the natural language interface to support some (all if possible!)
