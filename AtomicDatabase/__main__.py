@@ -113,7 +113,7 @@ def draw_imgui_table_database(DB):
     imgui.text_colored(table_error, 1, 0, 0, 1)
     imgui.end()
 
-def draw_eav_value(DB, ent, att, v):
+def draw_eav_value(DB, ent, att, v, metadata={}):
     global show_eav_db
     iden = "##" + str((ent, att, v))
     metadata = DB.attribute_metadata.get(att)
@@ -140,8 +140,17 @@ def draw_eav_value(DB, ent, att, v):
         )
         if changed:
             return (ent, att, new_value)
-    elif (metadata and metadata["type"] == 4) or (not metadata and isinstance(v, list)):
-        imgui.text(", ".join([e[1] for e in v]))
+    elif (metadata and metadata["is_list"]) or (not metadata and isinstance(v, list)):
+        changes = {}
+        new_md = None
+        if metadata and metadata.get("type"):
+            new_md = { "type": metadata["type"] }
+        for i, (lab, val) in enumerate(v):
+            change = draw_eav_value(DB, ent, att + "-" + str(i), val, new_md)
+            if change:
+                changes[i] = (lab, change)
+        for i, val in changes.items():
+            v[i] = val
     if imgui.is_item_hovered() and metadata:
         imgui.begin_tooltip()
         imgui.text_colored("Type: ", 0, 0, 1, 1)
@@ -515,11 +524,15 @@ def draw_imgui_attribute_metadata(DB):
             500,
             300,
         )
+
         clicked, metadata["type"] = imgui.combo(
             "Attribute Type##type-"+attr,
             metadata["type"],
             DB.type_name
         )
+
+        clicked, metadata["is_list"] = imgui.checkbox("Is List", bool(metadata.get("is_list")))
+
         if metadata["type"] == 2:
             imgui.text("Leave -1s to allow an arbitrary string.")
             changed, metadata["num_limits"] = imgui.input_int2('Int Limits##'+attr, *metadata["num_limits"])
@@ -545,8 +558,9 @@ def draw_imgui_attribute_metadata(DB):
         new_name = new_name.lower().replace(" ", "_").replace("-", "_")
         DB.attribute_metadata[new_name] = {
             "description": "",
-            "type": 0,
+            "type": 1,
             "num_limits": (0,0),
+            "is_list": False,
             "allowed_strings": []
         }
         attr_expanded[new_name] = False

@@ -217,7 +217,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                     new_binds = copy.copy(binds)
                     new_binds[tail[2][1]] = res
                     yield new_binds
-            elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
+            elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and (tail[2][0] == LITERAL or tail[2][0] == LIST):
                 res = db.get_value(tail[0][1], tail[1][1])
                 if res and res == tail[2][1]:
                     yield binds
@@ -275,7 +275,7 @@ def clean_symbol(e):
     else:
         return e
 
-def create_datatype(e, uuid=""):
+def create_datatype(e, entities, uuid=""):
     if isinstance(e, Bracket):
         return (LIST, [create_datatype(clean_symbol(sym), uuid) for sym in e._val])
     elif isinstance(e, str) and "ENTITY_" in e:
@@ -329,7 +329,7 @@ def create_rule(lst, entities, uuid=""):
             elif in_expr:
                 expr.append(e)
             else:
-                rule.append(create_datatype(e, uuid))
+                rule.append(create_datatype(e, entities, uuid))
     return rule
 
 def body(st, uuid=None):
