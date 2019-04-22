@@ -140,6 +140,8 @@ def draw_eav_value(DB, ent, att, v):
         )
         if changed:
             return (ent, att, new_value)
+    elif (metadata and metadata["type"] == 4) or (not metadata and isinstance(v, list)):
+        imgui.text(", ".join([e[1] for e in v]))
     if imgui.is_item_hovered() and metadata:
         imgui.begin_tooltip()
         imgui.text_colored("Type: ", 0, 0, 1, 1)
@@ -217,7 +219,10 @@ def draw_query(binds):
     for (k, v) in binds.items():
         imgui.text(str(k))
         imgui.next_column()
-        imgui.text(str(v))
+        if isinstance(v, list):
+            imgui.text(str([e[1] for e in v]))
+        else:
+            imgui.text(str(v))
         imgui.next_column()
 
     imgui.columns(1)

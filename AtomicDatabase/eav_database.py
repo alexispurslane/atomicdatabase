@@ -5,7 +5,7 @@ from collections import namedtuple
 from utils import *
 from enum import Enum
 from itertools import chain
-from sexpdata import loads, dumps, Symbol
+from sexpdata import loads, dumps, Symbol, Bracket
 import copy
 import inspect
 import pickle
@@ -15,6 +15,7 @@ VARIABLE   = 1
 EXPR       = 2
 LITERAL    = 3
 RULE       = 4
+LIST       = 5
 
 CONJ_OR    = 1
 CONJ_AND   = 2
@@ -45,7 +46,41 @@ def unify(a, b, binds={}):
             b_type = LITERAL
             b_val = eval_expr(b_val, binds)
 
-        if a_type == LITERAL and b_type == LITERAL:
+        if a_type == LIST and b_type == LIST:
+            print(a_val, b_val)
+            if len(a_val) != len(b_val):
+                return None
+            else:
+                res = unify(a_val, b_val, binds)
+                if not res:
+                    return None
+        elif b_type == LIST and a_type == VARIABLE:
+            a_kval = binds.get(a_val)
+            if a_kval:
+                new_binds = unify(b_val, a_kval, copy.copy(binds))
+                if new_binds:
+                    for k,v in new_binds.items():
+                        binds[k] = v
+                else:
+                    return None
+            elif not a_kval:
+                binds[a_val] = b_val
+            else:
+                return None
+        elif a_type == LIST and b_type == VARIABLE:
+            b_kval = binds.get(b_val)
+            if b_kval:
+                new_binds = unify(a_val, b_kval, copy.copy(binds))
+                if new_binds:
+                    for k,v in new_binds.items():
+                        binds[k] = v
+                else:
+                    return None
+            elif not b_kval:
+                binds[b_val] = a_val
+            else:
+                return None
+        elif a_type == LITERAL and b_type == LITERAL:
             if a_val == b_val:
                 continue
             else:
@@ -70,8 +105,12 @@ def unify(a, b, binds={}):
             a_kval = binds.get(a_val)
             b_kval = binds.get(b_val)
 
-            if a_kval == b_kval:
+            if a_kvel and b_kval and a_kval == b_kval:
                 continue
+            elif not a_kval:
+                binds[a_val] = b_kval
+            elif not b_kval:
+                binds[b_val] = a_kval
             else:
                 return None
     return binds
@@ -236,7 +275,24 @@ def clean_symbol(e):
     else:
         return e
 
-def create_rule(lst, entities, uuid=None):
+def create_datatype(e, uuid=""):
+    if isinstance(e, Bracket):
+        return (LIST, [create_datatype(clean_symbol(sym), uuid) for sym in e._val])
+    elif isinstance(e, str) and "ENTITY_" in e:
+        rematch = re.search("([0-9]+)", e)
+        if rematch:
+            number = int(rematch.group())
+            return (LITERAL, entities[number])
+        else:
+            return (LITERAL, e)
+    elif isinstance(e, str) and e[0].isupper() and not " " in e:
+        if uuid:
+            e += uuid
+        return (VARIABLE, e)
+    else:
+        return (LITERAL, e)
+
+def create_rule(lst, entities, uuid=""):
     rule = []
     lst = [clean_symbol(sym) for sym in lst]
     if lst[0] == "&":
@@ -255,7 +311,7 @@ def create_rule(lst, entities, uuid=None):
         rule.append(CONJ_COMP)
         rule.append(lst[0])
         rule.extend(create_rule(lst[1:], entities, uuid)[1:])
-    elif lst[0] == "unify":
+    elif lst[0] == "=":
         rule.append(UNIFY)
         rule.append(create_rule(lst[1], entities, uuid)[1:])
         rule.append(create_rule(lst[2], entities, uuid)[1:])
@@ -264,27 +320,16 @@ def create_rule(lst, entities, uuid=None):
         in_expr = False
         expr = []
         for e in lst:
-            if e == "expr":
-                in_expr = not in_expr
-                if in_expr:
-                    expr = []
-                else:
-                    rule.append((EXPR, expr))
+            if e == "{":
+                in_expr = True
+                expr = []
+            elif e == "}":
+                in_expr = False
+                rule.append((EXPR, expr))
             elif in_expr:
                 expr.append(e)
-            elif isinstance(e, str) and "ENTITY_" in e:
-                rematch = re.search("([0-9]+)", e)
-                if rematch:
-                    number = int(rematch.group())
-                    rule.append((LITERAL, entities[number]))
-                else:
-                    rule.append((LITERAL, e))
-            elif isinstance(e, str) and e[0].isupper() and not " " in e:
-                if uuid:
-                    e += uuid
-                rule.append((VARIABLE, e))
             else:
-                rule.append((LITERAL, e))
+                rule.append(create_datatype(e, uuid))
     return rule
 
 def body(st, uuid=None):
