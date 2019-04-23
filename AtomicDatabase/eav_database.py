@@ -337,26 +337,6 @@ def body(st, uuid=None):
     new_body, entities = create_text_entities("(& " + st + ")")
     return create_rule(loads(new_body), entities, uuid), st
 
-def validate(data, value):
-    is_ok = data["type"] == 0 and (value in self.entities) or\
-        data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
-                                                            value in data["allowed_strings"] or\
-                                                            len(data["allowed_strings"]) == 0) or\
-        (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
-
-    custom_message = ""
-    if data["type"] == 0:
-        custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
-    elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
-        custom_message = " between " + str(data["num_limits"][0]) + " and " +\
-            str(data["num_limits"][1]) + " (inclusive)"
-    elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
-        custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
-
-    if not is_ok:
-        raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
-                        self.type_name[data["type"]] + custom_message + ", got: " + str(value) + ".")
-
 class EAVDatabase:
     def __init__(self, **args):
         self.attributes = []
@@ -368,6 +348,36 @@ class EAVDatabase:
         if args != {}:
             args["eavs"] = { float(k): v for k, v in args["eavs"].items() }
             self.__dict__.update(args)
+
+    def validate(self, data, value):
+        if not data:
+            if isinstance(value, str) and value in self.entities:
+                data["type"] = 0
+            elif isinstance(value, str):
+                data["type"] = 1
+            elif isinstance(value, int):
+                data["type"] = 2
+            elif isinstance(value, float):
+                data["type"] = 3
+
+        is_ok = data["type"] == 0 and (value in self.entities) or\
+            data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
+                                                                value in data["allowed_strings"] or\
+                                                                len(data["allowed_strings"]) == 0) or\
+            (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
+
+        custom_message = ""
+        if data["type"] == 0:
+            custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
+        elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
+            custom_message = " between " + str(data["num_limits"][0]) + " and " +\
+                str(data["num_limits"][1]) + " (inclusive)"
+        elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
+            custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
+
+        if not is_ok:
+            raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
+                            self.type_name[data["type"]] + custom_message + ", got: " + str(value) + ".")
 
     def change_attribute_metadata(self, attr, new):
         self.attribute_metadata[attr] = new
