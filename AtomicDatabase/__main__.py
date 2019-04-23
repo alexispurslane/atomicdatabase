@@ -2,6 +2,7 @@ import io
 import hashlib
 import sys
 import copy
+import traceback
 
 from sdl2 import *
 import ctypes
@@ -117,20 +118,27 @@ def draw_imgui_table_database(DB):
 is_unfolded = {}
 def draw_eav_value(DB, ent, att, v, metadata={}):
     global show_eav_db, is_unfolded
-    iden = "##" + str((ent, att, v))
-    metadata = metadata or DB.attribute_metadata.get(att)
+    iden = "##" + str((ent, att))
+    metadata = metadata or DB.attribute_metadata.get(att, {})
     try:
         if (metadata and metadata.get("is_list")) or (not metadata and isinstance(v, list)):
+            print(is_unfolded)
             if not is_unfolded.get(iden):
                 is_unfolded[iden] = False
-            is_unfolded[iden], visible = imgui.collapsing_header("Show List", True)
+            is_unfolded[iden], visible = imgui.collapsing_header("Show List"+iden, True)
             if is_unfolded[iden]:
                 new_md = copy.copy(metadata)
-                new_md["is_list"] = False
+                if new_md:
+                    new_md["is_list"] = False
+                changes = {}
+                changed = False
                 for i, (lab, val) in enumerate(v):
                     change = draw_eav_value(DB, ent, att, val, new_md)
                     if change:
-                        v[i] = [lab, change[2]]
+                        changed = True
+                        changes[i] = (lab, change[2])
+                if changed:
+                    return (ent, att, [changes[i] if i in changes else (v[i][0], v[i][1]) for i in range(0,len(v))])
         elif (metadata and metadata["type"] == 0) or (not metadata and v in DB.entities):
             changed, new_entity = imgui.combo(
                 iden, DB.entities.index(v), DB.entities
@@ -155,7 +163,9 @@ def draw_eav_value(DB, ent, att, v, metadata={}):
             if changed:
                 return (ent, att, new_value)
     except Exception as e:
-        print("Error: " + str(e))
+        print("--------")
+        traceback.print_exc()
+        print("--------")
         imgui.text_colored(str(v), 1, 0, 0, 1)
     if imgui.is_item_hovered() and metadata:
         imgui.begin_tooltip()
@@ -553,7 +563,7 @@ def draw_imgui_attribute_metadata(DB):
             changed, strings = imgui.input_text(
                 "Allowed Strings##" + attr,
                 ','.join(metadata["allowed_strings"]),
-                26,
+                256,
                 imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
             )
             metadata["allowed_strings"] = list(filter(lambda x: len(x), strings.split(",")))

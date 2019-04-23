@@ -26,7 +26,6 @@ CONJ_COND  = 6
 
 def between_limits(value, limits):
     (a,b) = limits
-    print(value, a, b)
     return (value >= a or a == -1) and (value <= b or b == -1)
 
 def eav_hash(a, b):
@@ -47,7 +46,6 @@ def unify(a, b, binds={}):
             b_val = eval_expr(b_val, binds)
 
         if a_type == LIST and b_type == LIST:
-            print(a_val, b_val)
             if len(a_val) != len(b_val):
                 return None
             else:
@@ -276,8 +274,10 @@ def clean_symbol(e):
         return e
 
 def create_datatype(e, entities, uuid=""):
+    print(entities)
     if isinstance(e, Bracket):
-        return (LIST, [create_datatype(clean_symbol(sym), uuid) for sym in e._val])
+        return (LIST, [create_datatype(clean_symbol(sym), entities, uuid)
+                       for sym in e._val])
     elif isinstance(e, str) and "ENTITY_" in e:
         rematch = re.search("([0-9]+)", e)
         if rematch:
@@ -293,6 +293,7 @@ def create_datatype(e, entities, uuid=""):
         return (LITERAL, e)
 
 def create_rule(lst, entities, uuid=""):
+    print(entities)
     rule = []
     lst = [clean_symbol(sym) for sym in lst]
     if lst[0] == "&":
@@ -335,6 +336,26 @@ def create_rule(lst, entities, uuid=""):
 def body(st, uuid=None):
     new_body, entities = create_text_entities("(& " + st + ")")
     return create_rule(loads(new_body), entities, uuid), st
+
+def validate(data, value):
+    is_ok = data["type"] == 0 and (value in self.entities) or\
+        data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
+                                                            value in data["allowed_strings"] or\
+                                                            len(data["allowed_strings"]) == 0) or\
+        (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
+
+    custom_message = ""
+    if data["type"] == 0:
+        custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
+    elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
+        custom_message = " between " + str(data["num_limits"][0]) + " and " +\
+            str(data["num_limits"][1]) + " (inclusive)"
+    elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
+        custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
+
+    if not is_ok:
+        raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
+                        self.type_name[data["type"]] + custom_message + ", got: " + str(value) + ".")
 
 class EAVDatabase:
     def __init__(self, **args):
@@ -389,24 +410,11 @@ class EAVDatabase:
         if attr in self.attribute_metadata:
             data = self.attribute_metadata[attr]
 
-            is_ok = data["type"] == 0 and (value in self.entities) or\
-                data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
-                                                                  value in data["allowed_strings"] or\
-                                                                  len(data["allowed_strings"]) == 0) or\
-                (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
-
-            custom_message = ""
-            if data["type"] == 0:
-                custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
-            elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
-                custom_message = " between " + str(data["num_limits"][0]) + " and " +\
-                    str(data["num_limits"][1]) + " (inclusive)"
-            elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
-                custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
-
-            if not is_ok:
-                raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
-                                self.type_name[data["type"]] + custom_message + ", got: " + str(value) + ".")
+            if not data["is_list"]:
+                validate(data, value)
+            else:
+                for v in value:
+                    validate(data, v[1])
 
         self.eavs[eav_hash(forein_entity, forein_attr)] = (forein_entity, forein_attr, value)
 
