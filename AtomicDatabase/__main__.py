@@ -122,7 +122,6 @@ def draw_eav_value(DB, ent, att, v, metadata={}):
     metadata = metadata or DB.attribute_metadata.get(att, {})
     try:
         if (metadata and metadata.get("is_list")) or (not metadata and isinstance(v, list)):
-            print(is_unfolded)
             if not is_unfolded.get(iden):
                 is_unfolded[iden] = False
             is_unfolded[iden], visible = imgui.collapsing_header("Show List"+iden, True)

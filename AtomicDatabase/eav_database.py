@@ -349,16 +349,20 @@ class EAVDatabase:
             args["eavs"] = { float(k): v for k, v in args["eavs"].items() }
             self.__dict__.update(args)
 
-    def validate(self, data, value):
-        if not data:
-            if isinstance(value, str) and value in self.entities:
-                data["type"] = 0
-            elif isinstance(value, str):
-                data["type"] = 1
-            elif isinstance(value, int):
-                data["type"] = 2
-            elif isinstance(value, float):
-                data["type"] = 3
+    def validate(self, data, attr, value):
+        actual_type = 1
+        if isinstance(value, str) and value in self.entities:
+            actual_type = 0
+        elif isinstance(value, str):
+            actual_type = 1
+        elif isinstance(value, int):
+            actual_type = 2
+        elif isinstance(value, float):
+            actual_type = 3
+
+        if data["type"] != actual_type:
+            raise TypeError("Wrong type for " + attr + ". Expected " + self.type_name[data["type"]] +\
+                            ", got " + self.type_name[actual_type] + "!")
 
         is_ok = data["type"] == 0 and (value in self.entities) or\
             data["type"] == 1 and isinstance(value, str) and (not data["allowed_strings"] or\
@@ -421,10 +425,10 @@ class EAVDatabase:
             data = self.attribute_metadata[attr]
 
             if not data["is_list"]:
-                validate(data, value)
+                self.validate(data, attr, value)
             else:
                 for v in value:
-                    validate(data, v[1])
+                    self.validate(data, attr, v[1])
 
         self.eavs[eav_hash(forein_entity, forein_attr)] = (forein_entity, forein_attr, value)
 
