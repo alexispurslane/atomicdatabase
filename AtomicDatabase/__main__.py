@@ -195,19 +195,10 @@ def run():
 
             # draw window menu
             if imgui.begin_menu("Window", True):
-                _, SHOW_VARS['EAV'] = imgui.menu_item(
-                    "Show EAV View", selected=SHOW_VARS['EAV']
-                )
-                _, SHOW_VARS['TABLE'] = imgui.menu_item(
-                    "Show Table View", selected=SHOW_VARS['TABLE']
-                )
-                _, SHOW_VARS['EDITOR'] = imgui.menu_item(
-                    "Show Rules Editor", selected=SHOW_VARS['EDITOR']
-                )
-
-                _, SHOW_VARS['METADATA'] = imgui.menu_item(
-                    "Show Attribute Metadata Editor", selected=SHOW_VARS['METADATA']
-                )
+                for key in SHOW_VARS:
+                    _, SHOW_VARS[key] = imgui.menu_item(
+                        "Show " + key.title() + " View", selected=SHOW_VARS[key]
+                    )
 
                 imgui.end_menu()
 
@@ -241,6 +232,7 @@ def run():
         draw_imgui_database_rules(DB, font_extra2)
         draw_imgui_attribute_metadata(DB)
         draw_imgui_query_box(DB, font_extra2)
+        draw_imgui_constants_window(DB)
 
         # pop the style vars (this is required by Dear ImGui)
         imgui.pop_style_var(7)

@@ -284,7 +284,7 @@ def create_datatype(e, entities, uuid=""):
             return (LITERAL, entities[number])
         else:
             return (LITERAL, e)
-    elif isinstance(e, str) and e[0].isupper() and not " " in e:
+    elif isinstance(e, str) and e[0].isupper() == e[0] and not e[0].isnumeric() and not " " in e:
         if uuid:
             e += uuid
         return (VARIABLE, e)
@@ -377,13 +377,11 @@ class EAVDatabase:
             (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
 
         custom_message = ""
-        if data["type"] == 0:
-            custom_message = " from list that begins: " + ", ".join(self.entities[:3]) + "..."
+        if data["type"] == 0 and data["type"] == 1:
+            custom_message = " from: " + limit_format(self.entities) + "..."
         elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
-            custom_message = " between " + str(data["num_limits"][0]) + " and " +\
-                str(data["num_limits"][1]) + " (inclusive)"
-        elif data["type"] == 1  and len(data["allowed_strings"]) != 0:
-            custom_message = " from " + ", ".join(data["allowed_strings"][:3]) + "..."
+            custom_message = " between " + limit_format(data["num_limits"][0]) + " and " +\
+                limit_format(data["num_limits"][1]) + " (inclusive)"
 
         if not is_ok:
             raise ValueError("Incorrect type for attribute " + attr + ". Expected " +\
@@ -430,7 +428,7 @@ class EAVDatabase:
         if attr in self.attribute_metadata:
             data = self.attribute_metadata[attr]
 
-            if not data["is_list"]:
+            if not data.get("is_list"):
                 self.validate(data, attr, value)
             else:
                 for v in value:

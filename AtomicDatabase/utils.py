@@ -39,3 +39,12 @@ def peek(iterable):
     except StopIteration:
         return None
     return chain([first], iterable)
+
+def limit_format(obj):
+    if isinstance(obj, list):
+        return ", ".join(obj[:3])
+    elif isinstance(obj, (int, float)):
+        if obj == -1:
+            return "INF"
+        else:
+            return str(obj)
