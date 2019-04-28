@@ -15,11 +15,12 @@ import traceback
 import eav_database as eav
 import nl_eav_interface as nl
 
-show_eav_db = False
-show_table_db = True
-show_rules_db = False
-show_meta_attr = False
-
+SHOW_VARS = {
+    'METADATA': False,
+    'TABLE': True,
+    'EAV': False,
+    'EDITOR': False
+}
 
 #  ____  _                 _         ____                                             _
 # / ___|(_)_ __ ___  _ __ | | ___   / ___|___  _ __ ___  _ __   ___  _ __   ___ _ __ | |_ ___
@@ -57,7 +58,7 @@ def draw_ok_cancel_popup(ide, message="Type a Thing:"):
 
 is_unfolded = {}
 def draw_eav_value(DB, ent, att, v, metadata={}):
-    global show_eav_db, is_unfolded
+    global is_unfolded
     iden = "##" + str((ent, att))
     metadata = metadata or DB.attribute_metadata.get(att, {})
     try:
@@ -126,61 +127,62 @@ def draw_eav_value(DB, ent, att, v, metadata={}):
 
 attr_expanded = {}
 def draw_imgui_attribute_metadata(DB):
-    global attr_expanded, show_meta_attr
-    _, opened = imgui.begin("Database Attribute Editor", False)
-    show_meta_attr = opened
-    for attr, metadata in DB.attribute_metadata.items():
-        attr_expanded[attr], _ = imgui.collapsing_header(attr, True)
-        if not attr_expanded[attr]:
-            continue
-        changed, metadata["description"] = imgui.input_text_multiline(
-            'Description##desc-' + attr,
-            metadata["description"],
-            2056,
-            500,
-            300,
-        )
-
-        clicked, metadata["type"] = imgui.combo(
-            "Attribute Type##type-"+attr,
-            metadata["type"],
-            DB.type_name
-        )
-
-        clicked, metadata["is_list"] = imgui.checkbox("Is List", bool(metadata.get("is_list")))
-
-        if metadata["type"] == 2:
-            imgui.text("Leave -1s to allow an arbitrary string.")
-            changed, metadata["num_limits"] = imgui.input_int2('Int Limits##'+attr, *metadata["num_limits"])
-        elif metadata["type"] == 3:
-            imgui.text("Leave -1s to allow an arbitrary string.")
-            changed, metadata["num_limits"] = imgui.input_float2('Float Limits##'+attr, *metadata["num_limits"])
-        elif metadata["type"] == 1:
-            imgui.text("Leave blank to allow an arbitrary string.")
-            changed, strings = imgui.input_text(
-                "Allowed Strings##" + attr,
-                ','.join(metadata["allowed_strings"]),
-                256,
-                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+    global attr_expanded
+    if SHOW_VARS['METADATA']:
+        _, opened = imgui.begin("Database Attribute Editor", False)
+        SHOW_VARS['METADATA'] = SHOW_VARS['METADATA'] and opened
+        for attr, metadata in DB.attribute_metadata.items():
+            attr_expanded[attr], _ = imgui.collapsing_header(attr, True)
+            if not attr_expanded[attr]:
+                continue
+            changed, metadata["description"] = imgui.input_text_multiline(
+                'Description##desc-' + attr,
+                metadata["description"],
+                2056,
+                500,
+                300,
             )
-            metadata["allowed_strings"] = list(filter(lambda x: len(x), strings.split(",")))
-        elif metadata["type"] == 0:
-            imgui.text("All entities allowed")
-    if imgui.button("Add New Attribute Metadata"):
-        imgui.open_popup("new-attribute-meta")
 
-    new_name = draw_ok_cancel_popup("new-attribute-meta", "Attribute Name:")
-    if new_name:
-        new_name = new_name.lower().replace(" ", "_").replace("-", "_")
-        DB.attribute_metadata[new_name] = {
-            "description": "",
-            "type": 5,
-            "num_limits": (0,0),
-            "is_list": False,
-            "allowed_strings": []
-        }
-        attr_expanded[new_name] = False
-    imgui.end()
+            clicked, metadata["type"] = imgui.combo(
+                "Attribute Type##type-"+attr,
+                metadata["type"],
+                DB.type_name
+            )
+
+            clicked, metadata["is_list"] = imgui.checkbox("Is List", bool(metadata.get("is_list")))
+
+            if metadata["type"] == 2:
+                imgui.text("Leave -1s to allow an arbitrary string.")
+                changed, metadata["num_limits"] = imgui.input_int2('Int Limits##'+attr, *metadata["num_limits"])
+            elif metadata["type"] == 3:
+                imgui.text("Leave -1s to allow an arbitrary string.")
+                changed, metadata["num_limits"] = imgui.input_float2('Float Limits##'+attr, *metadata["num_limits"])
+            elif metadata["type"] == 1:
+                imgui.text("Leave blank to allow an arbitrary string.")
+                changed, strings = imgui.input_text(
+                    "Allowed Strings##" + attr,
+                    ','.join(metadata["allowed_strings"]),
+                    256,
+                    imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+                )
+                metadata["allowed_strings"] = list(filter(lambda x: len(x), strings.split(",")))
+            elif metadata["type"] == 0:
+                imgui.text("All entities allowed")
+        if imgui.button("Add New Attribute Metadata"):
+            imgui.open_popup("new-attribute-meta")
+
+        new_name = draw_ok_cancel_popup("new-attribute-meta", "Attribute Name:")
+        if new_name:
+            new_name = new_name.lower().replace(" ", "_").replace("-", "_")
+            DB.attribute_metadata[new_name] = {
+                "description": "",
+                "type": 5,
+                "num_limits": (0,0),
+                "is_list": False,
+                "allowed_strings": []
+            }
+            attr_expanded[new_name] = False
+        imgui.end()
 
 #  ____        _        _                     __     ___
 # |  _ \  __ _| |_ __ _| |__   __ _ ___  ___  \ \   / (_) _____      _____
@@ -194,114 +196,116 @@ search_query = {
 }
 table_error = ""
 def draw_imgui_table_database(DB):
-    global search_query, show_table_db, table_error
-    _, opened = imgui.begin("Table Database", True)
-    show_table_db = show_table_db and opened
+    global search_query, table_error
+    if SHOW_VARS['TABLE']:
+        _, opened = imgui.begin("Table Database", True)
+        SHOW_VARS['TABLE'] = SHOW_VARS['TABLE'] and opened
 
-    changed, search_query["entity"] = imgui.input_text(
-        "Search Entity##search",
-        search_query["entity"],
-        256,
-        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-    )
-    changed, search_query["attribute"] = imgui.input_text(
-        "Search Attribute##search-2",
-        search_query["attribute"],
-        26,
-        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-    )
+        changed, search_query["entity"] = imgui.input_text(
+            "Search Entity##search",
+            search_query["entity"],
+            256,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
+        changed, search_query["attribute"] = imgui.input_text(
+            "Search Attribute##search-2",
+            search_query["attribute"],
+            26,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
 
-    sqa = search_query["attribute"]
-    attributes = [a for a in DB.attributes if len(sqa) == 0 or (sqa in a or a in sqa)]
-    imgui.columns(len(attributes) + 1, "TblDBAttributes")
-    imgui.separator()
-    imgui.text("entity id")
-    imgui.next_column()
-    for a in attributes:
-        imgui.text(a)
-        imgui.next_column()
-    imgui.separator()
-
-    changes = []
-    sqe = search_query["entity"]
-    entities = [e for e in DB.entities if len(sqe) == 0 or (sqe in e or e in sqe)]
-    for e in entities:
-        imgui.text(e)
+        sqa = search_query["attribute"]
+        attributes = [a for a in DB.attributes if len(sqa) == 0 or (sqa in a or a in sqa)]
+        imgui.columns(len(attributes) + 1, "TblDBAttributes")
+        imgui.separator()
+        imgui.text("entity id")
         imgui.next_column()
         for a in attributes:
-            res = DB.get_value(e, a)
-            if res:
-                change = draw_eav_value(DB, e, a, res)
-                if change:
-                    changes.append(change)
-            else:
-                imgui.text("<N/A>")
+            imgui.text(a)
             imgui.next_column()
-    for change in changes:
-        try:
-            DB.add(change)
-            table_error = ""
-        except ValueError as e:
-            table_error = "Data Error: " + str(e)
-    imgui.columns(1)
-    imgui.text_colored(table_error, 1, 0, 0, 1)
-    imgui.end()
+        imgui.separator()
+
+        changes = []
+        sqe = search_query["entity"]
+        entities = [e for e in DB.entities if len(sqe) == 0 or (sqe in e or e in sqe)]
+        for e in entities:
+            imgui.text(e)
+            imgui.next_column()
+            for a in attributes:
+                res = DB.get_value(e, a)
+                if res:
+                    change = draw_eav_value(DB, e, a, res)
+                    if change:
+                        changes.append(change)
+                else:
+                    imgui.text("<N/A>")
+                imgui.next_column()
+        for change in changes:
+            try:
+                DB.add(change)
+                table_error = ""
+            except ValueError as e:
+                table_error = "Data Error: " + str(e)
+        imgui.columns(1)
+        imgui.text_colored(table_error, 1, 0, 0, 1)
+        imgui.end()
 
 def draw_imgui_eav_database(DB):
-    global table_error, show_eav_db
-    _, opened = imgui.begin("EAV Database", True)
-    show_eav_db = opened
-    changed, search_query["entity"] = imgui.input_text(
-        "Search Entity##search",
-        search_query["entity"],
-        256,
-        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-    )
-    changed, search_query["attribute"] = imgui.input_text(
-        "Search Attribute##search-2",
-        search_query["attribute"],
-        26,
-        imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
-    )
+    global table_error
+    if SHOW_VARS['EAV']:
+        _, opened = imgui.begin("EAV Database", True)
+        SHOW_VARS['EAV'] = SHOW_VARS['EAV'] and opened
+        changed, search_query["entity"] = imgui.input_text(
+            "Search Entity##search",
+            search_query["entity"],
+            256,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
+        changed, search_query["attribute"] = imgui.input_text(
+            "Search Attribute##search-2",
+            search_query["attribute"],
+            26,
+            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+        )
 
-    imgui.columns(3, "EavDBAttributes")
+        imgui.columns(3, "EavDBAttributes")
 
-    imgui.separator()
-    imgui.text("entity")
-    imgui.next_column()
-    imgui.text("attribute")
-    imgui.next_column()
-    imgui.text("value")
-    imgui.next_column()
-    imgui.separator()
+        imgui.separator()
+        imgui.text("entity")
+        imgui.next_column()
+        imgui.text("attribute")
+        imgui.next_column()
+        imgui.text("value")
+        imgui.next_column()
+        imgui.separator()
 
-    changes = []
-    sqa = search_query["attribute"]
-    sqe = search_query["entity"]
-    for (e, a, v) in DB.eavs.values():
-        ent = DB.entities[e]
-        att = DB.attributes[a]
-        if (len(sqa) == 0 or (sqa in att or att in sqa)) and (len(sqe) == 0 or (sqe in ent or ent in sqe)):
-            imgui.text(ent)
-            imgui.next_column()
-            imgui.text(att)
-            imgui.next_column()
+        changes = []
+        sqa = search_query["attribute"]
+        sqe = search_query["entity"]
+        for (e, a, v) in DB.eavs.values():
+            ent = DB.entities[e]
+            att = DB.attributes[a]
+            if (len(sqa) == 0 or (sqa in att or att in sqa)) and (len(sqe) == 0 or (sqe in ent or ent in sqe)):
+                imgui.text(ent)
+                imgui.next_column()
+                imgui.text(att)
+                imgui.next_column()
 
-            res = draw_eav_value(DB, ent, att, v)
-            if res:
-                changes.append(res)
-            imgui.next_column()
+                res = draw_eav_value(DB, ent, att, v)
+                if res:
+                    changes.append(res)
+                imgui.next_column()
 
-    for change in changes:
-        try:
-            DB.add(change)
-            table_error = ""
-        except ValueError as e:
-            table_error = "Data Error: " + str(e)
+        for change in changes:
+            try:
+                DB.add(change)
+                table_error = ""
+            except ValueError as e:
+                table_error = "Data Error: " + str(e)
 
-    imgui.columns(1)
-    imgui.text_colored(table_error, 1, 0, 0, 1)
-    imgui.end()
+        imgui.columns(1)
+        imgui.text_colored(table_error, 1, 0, 0, 1)
+        imgui.end()
 
 
 def draw_query(binds):
@@ -498,107 +502,110 @@ rule_expanded = {}
 rules_changed = {}
 rule_error = ""
 def draw_imgui_database_rules(DB, monospaced_font):
-    global rule_expanded, show_rules_db, rule_error
-    to_delete = []
-    _, opened = imgui.begin("Database Rules", True)
-    show_rules_db = opened
-    for name, rule in DB.rules.items():
-        imgui.push_font(monospaced_font)
-        rule_expanded[name], closed = imgui.collapsing_header(name, True)
-        imgui.pop_font()
-        if not closed:
-            to_delete.append(name)
-
-        if rule_expanded[name]:
-            imgui.push_item_width(100)
-            rule_args = rule["args"] or []
-            rule_lang = rule["lang"]
-            rule_text = rule["text"]
-            rule_body = rule["body"]
-            uuid = "-"+hashlib.md5(name.encode()).hexdigest()
-            arg_changed = False
-
+    global rule_expanded, rule_error, rules_changed
+    if SHOW_VARS['EDITOR']:
+        to_delete = []
+        _, opened = imgui.begin("Database Rules", True)
+        SHOW_VARS['EDITOR'] = SHOW_VARS['EDITOR'] and opened
+        for name, rule in DB.rules.items():
             imgui.push_font(monospaced_font)
-            for i, arg in enumerate(rule_args):
-                arg = arg.split("-")[0]
-                changed, rule_args[i] = imgui.input_text(
-                    "##" + str(i) + "arg-" + uuid,
-                    arg,
-                    26,
-                )
-                if changed and " " in rule_args[i]:
-                    rule_args[i] = rule_args[i].title().replace(" ", "")
-                arg_changed = changed or arg_changed
-                imgui.same_line()
+            rule_expanded[name], closed = imgui.collapsing_header(name, True)
             imgui.pop_font()
+            if not closed:
+                to_delete.append(name)
 
-            if imgui.button("+##new" + uuid):
-                rule_args.append("NewArgument")
-                arg_changed = True
-            imgui.same_line()
-            if imgui.button("-##del" + uuid):
-                if len(rule_args) != 0:
-                    del rule_args[-1]
-                arg_changed = True
-            imgui.same_line()
+            if rule_expanded[name]:
+                imgui.push_item_width(100)
+                rule_args = rule["args"] or []
+                rule_lang = rule["lang"]
+                rule_text = rule["text"]
+                rule_body = rule["body"]
+                uuid = "-"+hashlib.md5(name.encode()).hexdigest()
+                arg_changed = False
 
-            clicked, rule_lang = imgui.combo(
-                "##lang-" + uuid,
-                rule_lang,
-                ["S-Expr", "NL"]
-            )
-            imgui.pop_item_width()
-            if rule_lang == 0:
                 imgui.push_font(monospaced_font)
-            changed, rule_text = imgui.input_text_multiline(
-                '##body-' + uuid,
-                rule_text,
-                2056,
-                500,
-                300,
-            )
-            if rule_lang == 0:
+                for i, arg in enumerate(rule_args):
+                    arg = arg.split("-")[0]
+                    changed, rule_args[i] = imgui.input_text(
+                        "##" + str(i) + "arg-" + uuid,
+                        arg,
+                        26,
+                    )
+                    if changed and " " in rule_args[i]:
+                        rule_args[i] = rule_args[i].title().replace(" ", "")
+                    arg_changed = changed or arg_changed
+                    imgui.same_line()
                 imgui.pop_font()
 
-            rules_changed[name] = rules_changed.get(name, False) or changed
-            if rules_changed[name]:
-                imgui.push_text_wrap_pos()
-                imgui.text_colored("This rule has been changed. The text is saved, but if you want to save the excecutable code, click the button below.", 0, 0, 1, 1)
-                imgui.pop_text_wrap_pos()
-            if imgui.button("Save Code##"+uuid):
-                rules_changed[name] = False
-                try:
-                    if rule_lang == 0:
-                        rule_body, rule_text = eav.body(rule_text, uuid)
-                    elif rule_lang == 1:
-                        matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
-                        rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
-                    rule_error = ""
-                except Exception as e:
-                    rule_error = str(e)
+                if imgui.button("+##new" + uuid):
+                    rule_args.append("NewArgument")
+                    arg_changed = True
+                imgui.same_line()
+                if imgui.button("-##del" + uuid):
+                    if len(rule_args) != 0:
+                        del rule_args[-1]
+                    arg_changed = True
+                imgui.same_line()
 
-            DB.add_rule(name, rule_args, uuid, {
-                "lang": rule_lang,
-                "text": rule_text,
-                "body": rule_body
-            })
+                clicked, rule_lang = imgui.combo(
+                    "##lang-" + uuid,
+                    rule_lang,
+                    ["S-Expr", "NL"]
+                )
+                imgui.pop_item_width()
+                if rule_lang == 0:
+                    imgui.push_font(monospaced_font)
+                changed, rule_text = imgui.input_text_multiline(
+                    '##body-' + uuid,
+                    rule_text,
+                    2056,
+                    500,
+                    300,
+                )
+                if rule_lang == 0:
+                    imgui.pop_font()
 
-    if len(rule_error) > 0:
-        imgui.push_text_wrap_pos()
-        imgui.push_font(monospaced_font)
-        imgui.text_colored("Parse Error: " + rule_error, 1, 0, 0, 1)
-        imgui.pop_font()
-        imgui.pop_text_wrap_pos()
+                rules_changed[name] = rules_changed.get(name, False) or changed
+                if rules_changed[name]:
+                    imgui.push_text_wrap_pos()
+                    imgui.text_colored(("This rule has been changed. "
+                    "The text is saved, but if you want to save the excecutable code, "
+                    "click the button below."), 0, 0, 1, 1)
+                    imgui.pop_text_wrap_pos()
+                if imgui.button("Save Code##"+uuid):
+                    rules_changed[name] = False
+                    try:
+                        if rule_lang == 0:
+                            rule_body, rule_text = eav.body(rule_text, uuid)
+                        elif rule_lang == 1:
+                            matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
+                            rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
+                        rule_error = ""
+                    except Exception as e:
+                        rule_error = str(e)
 
-    for n in to_delete:
-        del DB.rules[n]
-    to_delete = []
+                DB.add_rule(name, rule_args, uuid, {
+                    "lang": rule_lang,
+                    "text": rule_text,
+                    "body": rule_body
+                })
 
-    if imgui.button("New Rule"):
-        imgui.open_popup("new-rule")
+        if len(rule_error) > 0:
+            imgui.push_text_wrap_pos()
+            imgui.push_font(monospaced_font)
+            imgui.text_colored("Parse Error: " + rule_error, 1, 0, 0, 1)
+            imgui.pop_font()
+            imgui.pop_text_wrap_pos()
 
-    new_name = draw_ok_cancel_popup("new-rule", "New Rule Name:")
-    if new_name:
-        if len(new_name) > 0:
-            DB.add_rule(new_name.lower().replace(" ", "_").replace("-", "_"))
-    imgui.end()
+        for n in to_delete:
+            del DB.rules[n]
+        to_delete = []
+
+        if imgui.button("New Rule"):
+            imgui.open_popup("new-rule")
+
+        new_name = draw_ok_cancel_popup("new-rule", "New Rule Name:")
+        if new_name:
+            if len(new_name) > 0:
+                DB.add_rule(new_name.lower().replace(" ", "_").replace("-", "_"))
+        imgui.end()

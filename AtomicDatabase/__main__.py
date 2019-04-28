@@ -195,18 +195,18 @@ def run():
 
             # draw window menu
             if imgui.begin_menu("Window", True):
-                _, show_eav_db = imgui.menu_item(
-                    "Show EAV View", selected=show_eav_db
+                _, SHOW_VARS['EAV'] = imgui.menu_item(
+                    "Show EAV View", selected=SHOW_VARS['EAV']
                 )
-                _, show_table_db = imgui.menu_item(
-                    "Show Table View", selected=show_table_db
+                _, SHOW_VARS['TABLE'] = imgui.menu_item(
+                    "Show Table View", selected=SHOW_VARS['TABLE']
                 )
-                _, show_rules_db = imgui.menu_item(
-                    "Show Rules Editor", selected=show_rules_db
+                _, SHOW_VARS['EDITOR'] = imgui.menu_item(
+                    "Show Rules Editor", selected=SHOW_VARS['EDITOR']
                 )
 
-                _, show_meta_attr = imgui.menu_item(
-                    "Show Attribute Metadata Editor", selected=show_meta_attr
+                _, SHOW_VARS['METADATA'] = imgui.menu_item(
+                    "Show Attribute Metadata Editor", selected=SHOW_VARS['METADATA']
                 )
 
                 imgui.end_menu()
@@ -236,14 +236,10 @@ def run():
             show_load_db = False
 
         # draw each gui window (from the module) if they are set to be drawn
-        if show_table_db:
-            draw_imgui_table_database(DB)
-        if show_eav_db:
-            draw_imgui_eav_database(DB)
-        if show_rules_db:
-            draw_imgui_database_rules(DB, font_extra2)
-        if show_meta_attr:
-            draw_imgui_attribute_metadata(DB)
+        draw_imgui_table_database(DB)
+        draw_imgui_eav_database(DB)
+        draw_imgui_database_rules(DB, font_extra2)
+        draw_imgui_attribute_metadata(DB)
         draw_imgui_query_box(DB, font_extra2)
 
         # pop the style vars (this is required by Dear ImGui)
