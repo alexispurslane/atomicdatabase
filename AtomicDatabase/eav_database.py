@@ -11,6 +11,14 @@ import inspect
 import pickle
 import json
 
+
+#  ____  _____ _       _____             _
+# / ___|| ____| |     | ____|_ __   __ _(_)_ __   ___
+# \___ \|  _| | |     |  _| | '_ \ / _` | | '_ \ / _ \
+#  ___) | |___| |___  | |___| | | | (_| | | | | |  __/
+# |____/|_____|_____| |_____|_| |_|\__, |_|_| |_|\___|
+#                                 |___/
+
 VARIABLE   = 1
 EXPR       = 2
 LITERAL    = 3
@@ -24,17 +32,7 @@ UNIFY      = 4
 CONJ_COMP  = 5
 CONJ_COND  = 6
 
-def between_limits(value, limits):
-    (a,b) = limits
-    return (value >= a or a == -1) and (value <= b or b == -1)
-
-def eav_hash(a, b):
-    return 0.5*(a + b)*(a + b + 1)+b
-
-def eval_expr(val, binds):
-    return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
-
-def unify(a, b, binds={}):
+def unify(a, b, binds={}, global_binds={}):
     for i in range(0, min(len(a), len(b))):
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
@@ -49,13 +47,13 @@ def unify(a, b, binds={}):
             if len(a_val) != len(b_val):
                 return None
             else:
-                res = unify(a_val, b_val, binds)
+                res = unify(a_val, b_val, binds, global_binds)
                 if not res:
                     return None
         elif b_type == LIST and a_type == VARIABLE:
-            a_kval = binds.get(a_val)
+            a_kval = get_binds(a_val, binds, global_binds)
             if a_kval:
-                new_binds = unify(b_val, a_kval, copy.copy(binds))
+                new_binds = unify(b_val, a_kval, copy.copy(binds), global_binds)
                 if new_binds:
                     for k,v in new_binds.items():
                         binds[k] = v
@@ -66,9 +64,9 @@ def unify(a, b, binds={}):
             else:
                 return None
         elif a_type == LIST and b_type == VARIABLE:
-            b_kval = binds.get(b_val)
+            b_kval = get_binds(b_val, binds, global_binds)
             if b_kval:
-                new_binds = unify(a_val, b_kval, copy.copy(binds))
+                new_binds = unify(a_val, b_kval, copy.copy(binds), global_binds)
                 if new_binds:
                     for k,v in new_binds.items():
                         binds[k] = v
@@ -84,7 +82,7 @@ def unify(a, b, binds={}):
             else:
                 return None
         elif a_type == VARIABLE and b_type == LITERAL:
-            a_kval = binds.get(a_val)
+            a_kval = get_binds(a_val, binds, global_binds)
             if a_kval and a_kval == b_val:
                 continue
             elif not a_kval:
@@ -92,7 +90,7 @@ def unify(a, b, binds={}):
             else:
                 return None
         elif b_type == VARIABLE and a_type == LITERAL:
-            b_kval = binds.get(b_val)
+            b_kval = get_binds(b_val, binds, global_binds)
             if b_kval and b_kval == a_val:
                 continue
             elif not b_kval:
@@ -100,10 +98,10 @@ def unify(a, b, binds={}):
             else:
                 return None
         elif a_type == VARIABLE and b_type == VARIABLE:
-            a_kval = binds.get(a_val)
-            b_kval = binds.get(b_val)
+            a_kval = get_binds(a_val, binds, global_binds)
+            b_kval = get_binds(b_val, binds, global_binds)
 
-            if a_kvel and b_kval and a_kval == b_kval:
+            if a_kval and b_kval and a_kval == b_kval:
                 continue
             elif not a_kval:
                 binds[a_val] = b_kval
@@ -112,13 +110,6 @@ def unify(a, b, binds={}):
             else:
                 return None
     return binds
-
-def peek(iterable):
-    try:
-        first = next(iterable)
-    except StopIteration:
-        return None
-    return chain([first], iterable)
 
 def evaluate_cond_rule(db, branches, binds={}, subs={}):
     if branches == []:
@@ -227,12 +218,21 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                     eav_rule = [(LITERAL, db.entities[e]),
                                 (LITERAL, db.attributes[a]),
                                 (LITERAL, v)]
-                    res = unify(tail, eav_rule, copy.copy(binds))
+                    res = unify(tail, eav_rule, copy.copy(binds), db.global_binds)
                     if res != None:
                         yield res
     elif head == CONJ_COMP:
         op, *args = tail
-        vals = [binds[e[1]] if e[0] == VARIABLE and e[1] in binds else e[1] for e in args]
+        vals = []
+        for e in args:
+            if e[0] == VARIABLE:
+                val = binds.get(e[1])
+                if val:
+                    vals.append(val)
+                else:
+                    raise ValueError("Undefined variable " + val[1] + "!")
+            else:
+                vals.append(e[1])
         failed = False
         last = None
         for v in vals:
@@ -255,7 +255,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             yield binds
     elif head == UNIFY:
         new_binds = copy.copy(binds)
-        res = unify(tail[0], tail[1], new_binds)
+        res = unify(tail[0], tail[1], new_binds, db.global_binds)
         if res != None:
             yield res
     elif head == CONJ_OR:
@@ -274,7 +274,6 @@ def clean_symbol(e):
         return e
 
 def create_datatype(e, entities, uuid=""):
-    print(entities)
     if isinstance(e, Bracket):
         return (LIST, [create_datatype(clean_symbol(sym), entities, uuid)
                        for sym in e._val])
@@ -314,8 +313,8 @@ def create_rule(lst, entities, uuid=""):
         rule.extend(create_rule(lst[1:], entities, uuid)[1:])
     elif lst[0] == "=":
         rule.append(UNIFY)
-        rule.append(create_rule(lst[1], entities, uuid)[1:])
-        rule.append(create_rule(lst[2], entities, uuid)[1:])
+        rule.append(create_rule([lst[1]], entities, uuid)[1:])
+        rule.append(create_rule(lst[2:], entities, uuid)[1:])
     else:
         rule.append(PREDICATE)
         in_expr = False
@@ -337,12 +336,19 @@ def body(st, uuid=None):
     new_body, entities = create_text_entities("(& " + st + ")")
     return create_rule(loads(new_body), entities, uuid), st
 
+#  _____    ___     __  ____        _        _
+# | ____|  / \ \   / / |  _ \  __ _| |_ __ _| |__   __ _ ___  ___
+# |  _|   / _ \ \ / /  | | | |/ _` | __/ _` | '_ \ / _` / __|/ _ \
+# | |___ / ___ \ V /   | |_| | (_| | || (_| | |_) | (_| \__ \  __/
+# |_____/_/   \_\_/    |____/ \__,_|\__\__,_|_.__/ \__,_|___/\___|
+
 class EAVDatabase:
     def __init__(self, **args):
         self.attributes = []
         self.attribute_metadata = {}
         self.entities = []
         self.eavs = {}
+        self.global_binds = {}
         self.rules = {}
         self.type_name = ["entity", "string", "int", "float"]
         if args != {}:

@@ -14,4 +14,28 @@ def create_text_entities(string):
                 entities[-1] += c
             else:
                 new_str += c
-    return new_str, entities
+    return new_str.replace("{", " { ").\
+        replace("}", " } "), entities
+
+def between_limits(value, limits):
+    (a,b) = limits
+    return (value >= a or a == -1) and (value <= b or b == -1)
+
+def eav_hash(a, b):
+    return 0.5*(a + b)*(a + b + 1)+b
+
+def eval_expr(val, binds):
+    return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
+
+def get_binds(name, binds, global_binds):
+    if name[0] == '*':
+        return global_binds.get(name)
+    else:
+        return binds.get(name)
+
+def peek(iterable):
+    try:
+        first = next(iterable)
+    except StopIteration:
+        return None
+    return chain([first], iterable)
