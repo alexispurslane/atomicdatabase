@@ -28,7 +28,9 @@ def eval_expr(val, binds):
     return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def get_binds(name, binds, global_binds):
+    print(name)
     if name[0] == '*':
+        print(global_binds)
         return global_binds.get(name)
     else:
         return binds.get(name)

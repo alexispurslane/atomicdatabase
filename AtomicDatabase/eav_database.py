@@ -226,7 +226,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         vals = []
         for e in args:
             if e[0] == VARIABLE:
-                val = binds.get(e[1])
+                val = get_binds(e[1], binds, db.global_binds)
                 if val:
                     vals.append(val)
                 else:
@@ -284,7 +284,7 @@ def create_datatype(e, entities, uuid=""):
             return (LITERAL, entities[number])
         else:
             return (LITERAL, e)
-    elif isinstance(e, str) and e[0].isupper() == e[0] and not e[0].isnumeric() and not " " in e:
+    elif isinstance(e, str) and e[0].upper() == e[0] and not e[0].isnumeric() and not " " in e:
         if uuid:
             e += uuid
         return (VARIABLE, e)

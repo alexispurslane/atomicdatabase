@@ -63,64 +63,69 @@ data_type = 1
 data_value = ""
 query_error = ""
 
-def draw_data_popup(DB):
+def draw_data_popup(DB, constant=False):
     global data_entity, data_attr, data_type, data_value, query_error
-    changed, data_entity = imgui.combo(
-        "Entity##data-entity", data_entity, DB.entities
-    )
-    changed, data_attr = imgui.input_text(
-        'Attribute##data-attr',
-        data_attr,
-        256,
-    )
-    data_attr = data_attr.lower().replace(" ", "_").replace("-", "_")
-    changed, data_type = imgui.combo(
-        "Value Type##data-type", data_type, DB.type_name
-    )
-    if changed and (data_type == 2 or data_type == 3 or data_type == 0):
-        data_value = 0
-    elif changed and data_type == 1:
-        data_value = ""
-    if data_type == 0:
-        changed, data_value = imgui.combo(
-            "Value##data-value-entity",
-            data_value,
-            DB.entities
-        )
-    elif data_type == 1:
-        changed, data_value = imgui.input_text(
-            'Value##data-value-string',
-            data_value,
+    if imgui.begin_popup("new-data"):
+        if not constant:
+            changed, data_entity = imgui.combo(
+                "Entity##data-entity", data_entity, DB.entities
+            )
+        changed, data_attr = imgui.input_text(
+            'Attribute##data-attr',
+            data_attr,
             256,
-            imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
         )
-    elif data_type == 2:
-        changed, data_value = imgui.input_int(
-            'Value##data-value-int',
-            data_value
+        data_attr = data_attr.lower().replace(" ", "_").replace("-", "_")
+        changed, data_type = imgui.combo(
+            "Value Type##data-type", data_type, DB.type_name
         )
-    elif data_type == 3:
-        changed, data_value = imgui.input_float(
-            'Value##data-value-float',
-            data_value
-        )
-    if imgui.button("OK") or imgui.get_io().keys_down[SDL_SCANCODE_RETURN]:
-        try:
-            if data_type == 0:
-                data_value = DB.entities[data_value]
-            DB.add((DB.entities[data_entity], data_attr, data_value))
-            query_error = ""
-            data_entity = 0
-            data_attr = ""
-            data_type = 1
+        if changed and (data_type == 2 or data_type == 3 or data_type == 0):
+            data_value = 0
+        elif changed and data_type == 1:
             data_value = ""
+        if data_type == 0:
+            changed, data_value = imgui.combo(
+                "Value##data-value-entity",
+                data_value,
+                DB.entities
+            )
+        elif data_type == 1:
+            changed, data_value = imgui.input_text(
+                'Value##data-value-string',
+                data_value,
+                256,
+                imgui.INPUT_TEXT_ENTER_RETURNS_TRUE
+            )
+        elif data_type == 2:
+            changed, data_value = imgui.input_int(
+                'Value##data-value-int',
+                data_value
+            )
+        elif data_type == 3:
+            changed, data_value = imgui.input_float(
+                'Value##data-value-float',
+                data_value
+            )
+        if imgui.button("OK") or imgui.get_io().keys_down[SDL_SCANCODE_RETURN]:
+            try:
+                if data_type == 0:
+                    data_value = DB.entities[data_value]
+                if constant:
+                    DB.global_binds[data_attr] = data_value
+                else:
+                    DB.add((DB.entities[data_entity], data_attr, data_value))
+                query_error = ""
+                data_entity = 0
+                data_attr = ""
+                data_type = 1
+                data_value = ""
+                imgui.close_current_popup()
+            except ValueError as e:
+                query_error = "Data Error: " + str(e)
+        imgui.same_line()
+        if imgui.button("Cancel"):
             imgui.close_current_popup()
-        except ValueError as e:
-            query_error = "Data Error: " + str(e)
-    imgui.same_line()
-    if imgui.button("Cancel"):
-        imgui.close_current_popup()
-    imgui.end_popup()
+        imgui.end_popup()
 
 is_unfolded = {}
 def draw_eav_value(DB, ent, att, v, metadata={}):
@@ -490,8 +495,7 @@ def draw_imgui_query_box(DB, monospace_font):
         print("New entity created: " + str(ent_value))
         DB.entities.append(ent_value)
 
-    if imgui.begin_popup("new-data"):
-        draw_data_popup(DB)
+    draw_data_popup(DB)
 
     if imgui.begin_popup("confirm"):
         imgui.text("Are you sure you want to clear the bindings?")
@@ -637,4 +641,8 @@ def draw_imgui_constants_window(DB):
                     if new_val:
                         DB.global_binds[name] = new_val
                 imgui.unindent()
+
+        if imgui.button("New Constant"):
+            imgui.open_popup("new-data")
+        draw_data_popup(DB, True)
         imgui.end()
