@@ -57,10 +57,12 @@ def unify(a, b, binds={}, global_binds={}):
 
         if (a_type == LIST and is_destructuring_pattern(a_val) and (b_type == LIST or b_type == VARIABLE)) or\
            (b_type == LIST and is_destructuring_pattern(b_val) and (a_type == LIST or a_type == VARIABLE)):
-            if is_destructuring_pattern(b_val):
-                tmp = a_val
-                a_val = b_val
-                b_val = tmp
+            if a_type == VARIABLE:
+                var_a_val = get_binds(a_val, binds, global_binds)
+                if not var_a_val:
+                    raise ValueError("Undefined variable " + b_val)
+                else:
+                    a_val = var_a_val
 
             if b_type == VARIABLE:
                 var_b_val = get_binds(b_val, binds, global_binds)
@@ -68,6 +70,18 @@ def unify(a, b, binds={}, global_binds={}):
                     raise ValueError("Undefined variable " + b_val)
                 else:
                     b_val = var_b_val
+
+            if is_destructuring_pattern(b_val):
+                tmp = a_val
+                a_val = b_val
+                b_val = tmp
+
+                tmp = a_type
+                a_type = b_type
+                b_type = tmp
+
+            print((a_val, a_type))
+            print((b_val, b_type))
 
             a_val = [(get_binds(v, binds, global_binds) or v) if t == VARIABLE else v for t, v in a_val]
             b_val = [get_binds(v, binds, global_binds) if t == VARIABLE else v for t, v in b_val]
