@@ -59,15 +59,15 @@ def unify(a, b, binds={}, global_binds={}):
            (b_type == LIST and is_destructuring_pattern(b_val) and (a_type == LIST or a_type == VARIABLE)):
             if a_type == VARIABLE:
                 var_a_val = get_binds(a_val, binds, global_binds)
-                if not var_a_val:
-                    raise ValueError("Undefined variable " + b_val)
+                if var_a_val == None:
+                    raise ValueError("Undefined variable " + str(a_val))
                 else:
                     a_val = var_a_val
 
             if b_type == VARIABLE:
                 var_b_val = get_binds(b_val, binds, global_binds)
-                if not var_b_val:
-                    raise ValueError("Undefined variable " + b_val)
+                if var_a_val == None:
+                    raise ValueError("Undefined variable " + str(b_val))
                 else:
                     b_val = var_b_val
 
@@ -80,13 +80,11 @@ def unify(a, b, binds={}, global_binds={}):
                 a_type = b_type
                 b_type = tmp
 
-            print((a_val, a_type))
-            print((b_val, b_type))
-
             a_val = [(get_binds(v, binds, global_binds) or v) if t == VARIABLE else v for t, v in a_val]
             b_val = [get_binds(v, binds, global_binds) if t == VARIABLE else v for t, v in b_val]
             new_binds = destructure(a_val, b_val)
-            if new_binds:
+            print(new_binds)
+            if new_binds != None:
                 binds_so_far = copy.copy(binds)
                 for binding in new_binds:
                     # side1 doesn't need to be wrapped *internally* because the
@@ -94,9 +92,8 @@ def unify(a, b, binds={}, global_binds={}):
                     # unwrapped! However, it does need to be wrapped on the outside.
                     side1 = ast_value_wrap(binding[0], False)
                     side2 = ast_value_wrap(binding[1])
-                    print(side1, side2)
                     res = unify([side1], [side2], copy.copy(binds_so_far), global_binds)
-                    if res:
+                    if res != None:
                         binds_so_far = res
                     else:
                         return None
@@ -104,12 +101,15 @@ def unify(a, b, binds={}, global_binds={}):
             else:
                 return None
         elif a_type == LIST and b_type == LIST:
+            print("IN VALS: " + str((a_val, b_val)))
             if len(a_val) != len(b_val):
                 return None
             else:
-                res = unify(a_val, b_val, binds, global_binds)
-                if not res:
+                res = unify(a_val, b_val, copy.copy(binds), global_binds)
+                if res == None:
                     return None
+                else:
+                    binds = res
         elif (b_type == LIST and a_type == VARIABLE) or (a_type == LIST and b_type == VARIABLE):
             if b_type == VARIABLE:
                 tmp = a_val
@@ -117,14 +117,15 @@ def unify(a, b, binds={}, global_binds={}):
                 b_val = tmp
 
             a_kval = get_binds(a_val, binds, global_binds)
-            if a_kval:
-                new_binds = unify(b_val, a_kval, copy.copy(binds), global_binds)
-                if new_binds:
-                    for k,v in new_binds.items():
-                        binds[k] = v
+            if a_kval != None and isinstance(a_kval, list):
+                print("IN VALS: " + str((a_kval, b_val)))
+                new_binds = unify([(b_type, b_val)], [(LIST, a_kval)], copy.copy(binds), global_binds)
+                print("RESULT BINDS: " + str(new_binds))
+                if new_binds != None:
+                    binds.update(new_binds)
                 else:
                     return None
-            elif not a_kval:
+            elif a_kval == None:
                 binds[a_val] = b_val
             else:
                 return None
@@ -135,7 +136,7 @@ def unify(a, b, binds={}, global_binds={}):
                 b_val = tmp
 
             a_kval = get_binds(a_val, binds, global_binds)
-            if a_kval and a_kval == b_val:
+            if a_kval != None and a_kval == b_val:
                 continue
             elif not a_kval:
                 binds[a_val] = b_val
@@ -150,7 +151,7 @@ def unify(a, b, binds={}, global_binds={}):
             a_kval = get_binds(a_val, binds, global_binds)
             b_kval = get_binds(b_val, binds, global_binds)
 
-            if a_kval and b_kval and a_kval == b_kval:
+            if a_kval != None and b_kval != None and a_kval == b_kval:
                 continue
             elif not a_kval:
                 binds[a_val] = b_kval
@@ -197,7 +198,6 @@ types = [
 def evaluate_rule(db, rule, binds={}, subs={}):
     global types
     head, *tail = rule
-    print(head, tail)
     max_args = types[head-1]["arg_count"][1]
     min_args = types[head-1]["arg_count"][0]
     if len(tail) < min_args:
@@ -225,12 +225,9 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             params = var_names[:1] + var_names[2:]
             substitutions = dict(zip(rule["args"], params))
 
-            lit_vals = [val if tpe == LITERAL else None for (tpe, val) in tail]
+            lit_vals = [val if tpe == LITERAL or tpe == LIST else None for (tpe, val) in tail]
             inputs = lit_vals[:1] + lit_vals[2:]
-            input_binds = { k: v for k, v in zip(rule["args"], inputs) if v }
-            for key, value in binds.items():
-                if not key in input_binds:
-                    input_binds[key] = value
+            input_binds = { k: v for k, v in zip(rule["args"], inputs) if v != None }
 
             print("CALL RULE:\t" + tail[1][1])
             print("PARAMS:\t" + str(params))
@@ -322,9 +319,9 @@ def clean_symbol(e):
     else:
         return e
 
-def create_datatype(e, entities, uuid=""):
+def create_datatype(e, entities):
     if isinstance(e, Bracket):
-        return (LIST, [create_datatype(clean_symbol(sym), entities, uuid)
+        return (LIST, [create_datatype(clean_symbol(sym), entities)
                        for sym in e._val])
     elif isinstance(e, str) and "ENTITY_" in e:
         rematch = re.search("([0-9]+)", e)
@@ -334,36 +331,33 @@ def create_datatype(e, entities, uuid=""):
         else:
             return (LITERAL, e)
     elif is_variable(e):
-        if uuid:
-            e += uuid
         return (VARIABLE, e)
     else:
         return (LITERAL, e)
 
-def create_rule(lst, entities, uuid=""):
-    print(entities)
+def create_rule(lst, entities):
     rule = []
     lst = [clean_symbol(sym) for sym in lst]
     if lst[0] == "&":
         rule.append(CONJ_AND)
         for r in lst[1:]:
-            rule.append(create_rule(r, entities, uuid))
+            rule.append(create_rule(r, entities))
     elif lst[0] == "|":
         rule.append(CONJ_OR)
         for r in lst[1:]:
-            rule.append(create_rule(r, entities, uuid))
+            rule.append(create_rule(r, entities))
     elif lst[0] == "?":
         rule.append(CONJ_COND)
         for r in lst[1:]:
-            rule.append(create_rule(r, entities, uuid))
+            rule.append(create_rule(r, entities))
     elif lst[0] in ["<", ">", "<=", ">="]:
         rule.append(CONJ_COMP)
         rule.append(lst[0])
-        rule.extend(create_rule(lst[1:], entities, uuid)[1:])
+        rule.extend(create_rule(lst[1:], entities)[1:])
     elif lst[0] == "=":
         rule.append(UNIFY)
-        rule.append(create_rule([lst[1]], entities, uuid)[1:])
-        rule.append(create_rule(lst[2:], entities, uuid)[1:])
+        rule.append(create_rule([lst[1]], entities)[1:])
+        rule.append(create_rule(lst[2:], entities)[1:])
     else:
         rule.append(PREDICATE)
         in_expr = False
@@ -378,12 +372,12 @@ def create_rule(lst, entities, uuid=""):
             elif in_expr:
                 expr.append(e)
             else:
-                rule.append(create_datatype(e, entities, uuid))
+                rule.append(create_datatype(e, entities))
     return rule
 
-def body(st, uuid=None):
+def body(st):
     new_body, entities = create_text_entities("(& " + st + ")")
-    return create_rule(loads(new_body), entities, uuid), st
+    return create_rule(loads(new_body), entities), st
 
 #  _____    ___     __  ____        _        _
 # | ____|  / \ \   / / |  _ \  __ _| |_ __ _| |__   __ _ ___  ___
@@ -439,14 +433,14 @@ class EAVDatabase:
     def change_attribute_metadata(self, attr, new):
         self.attribute_metadata[attr] = new
 
-    def add_rule(self, name, rule_args=[], uuid="", new_rule={
+    def add_rule(self, name, rule_args=[], new_rule={
             "lang": 0,
             "text": "",
             "body": ""
         }):
         new_rule.update({
             "name": name,
-            "args": [arg+uuid for arg in rule_args],
+            "args": [arg for arg in rule_args],
         })
         self.rules[name] = new_rule
 

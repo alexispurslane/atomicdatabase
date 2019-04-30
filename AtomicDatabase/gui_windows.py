@@ -534,14 +534,12 @@ def draw_imgui_database_rules(DB, monospaced_font):
                 rule_lang = rule["lang"]
                 rule_text = rule["text"]
                 rule_body = rule["body"]
-                uuid = "-"+hashlib.md5(name.encode()).hexdigest()
                 arg_changed = False
 
                 imgui.push_font(monospaced_font)
                 for i, arg in enumerate(rule_args):
-                    arg = arg.split("-")[0]
                     changed, rule_args[i] = imgui.input_text(
-                        "##" + str(i) + "arg-" + uuid,
+                        "##" + str(i) + "arg-" + name,
                         arg,
                         26,
                     )
@@ -551,18 +549,18 @@ def draw_imgui_database_rules(DB, monospaced_font):
                     imgui.same_line()
                 imgui.pop_font()
 
-                if imgui.button("+##new" + uuid):
+                if imgui.button("+##new" + name):
                     rule_args.append("NewArgument")
                     arg_changed = True
                 imgui.same_line()
-                if imgui.button("-##del" + uuid):
+                if imgui.button("-##del" + name):
                     if len(rule_args) != 0:
                         del rule_args[-1]
                     arg_changed = True
                 imgui.same_line()
 
                 clicked, rule_lang = imgui.combo(
-                    "##lang-" + uuid,
+                    "##lang-" + name,
                     rule_lang,
                     ["S-Expr", "NL"]
                 )
@@ -570,7 +568,7 @@ def draw_imgui_database_rules(DB, monospaced_font):
                 if rule_lang == 0:
                     imgui.push_font(monospaced_font)
                 changed, rule_text = imgui.input_text_multiline(
-                    '##body-' + uuid,
+                    '##body-' + name,
                     rule_text,
                     2056,
                     500,
@@ -586,19 +584,19 @@ def draw_imgui_database_rules(DB, monospaced_font):
                     "The text is saved, but if you want to save the excecutable code, "
                     "click the button below."), 0, 0, 1, 1)
                     imgui.pop_text_wrap_pos()
-                if imgui.button("Save Code##"+uuid):
+                if imgui.button("Save Code##"+name):
                     rules_changed[name] = False
                     try:
                         if rule_lang == 0:
-                            rule_body, rule_text = eav.body(rule_text, uuid)
+                            rule_body, rule_text = eav.body(rule_text)
                         elif rule_lang == 1:
                             matches, entities = nl.understand_predicate(nlp, matcher, rule_text)
-                            rule_body = nl.convert_nlast_to_rules(matches, entities, uuid)
+                            rule_body = nl.convert_nlast_to_rules(matches, entities)
                         rule_error = ""
                     except Exception as e:
                         rule_error = str(e)
 
-                DB.add_rule(name, rule_args, uuid, {
+                DB.add_rule(name, rule_args, {
                     "lang": rule_lang,
                     "text": rule_text,
                     "body": rule_body

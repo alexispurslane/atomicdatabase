@@ -77,6 +77,9 @@ def destructure(pattern, value):
     if len(rest_parse) >= 3:
         rest_var   = rest_parse[2][0]
 
+    if len(match_vars) + int(not not rest_var) > len(value):
+        return None
+
     if all_var:
         binds.append((all_var, value))
     if rest_var:
@@ -84,4 +87,5 @@ def destructure(pattern, value):
     if len(match_vars) > 0:
         binds.extend(zip(match_vars, value[:len(match_vars)]))
 
+    print("DESTRUCTURING BINDS: " + str(binds))
     return binds
