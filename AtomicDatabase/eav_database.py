@@ -31,6 +31,18 @@ PREDICATE  = 3
 UNIFY      = 4
 CONJ_COMP  = 5
 CONJ_COND  = 6
+BUILTIN    = 7
+
+
+def ast_value_wrap(val, decend=True):
+    if is_variable(val):
+        return (VARIABLE, val)
+    elif isinstance(val, list):
+        if decend:
+            val = [ast_value_wrap(v) for v in val]
+        return (LIST, val)
+    else:
+        return (LITERAL, val)
 
 def unify(a, b, binds={}, global_binds={}):
     for i in range(0, min(len(a), len(b))):
@@ -43,14 +55,53 @@ def unify(a, b, binds={}, global_binds={}):
             b_type = LITERAL
             b_val = eval_expr(b_val, binds)
 
-        if a_type == LIST and b_type == LIST:
+        if (a_type == LIST and is_destructuring_pattern(a_val) and (b_type == LIST or b_type == VARIABLE)) or\
+           (b_type == LIST and is_destructuring_pattern(b_val) and (a_type == LIST or a_type == VARIABLE)):
+            if is_destructuring_pattern(b_val):
+                tmp = a_val
+                a_val = b_val
+                b_val = tmp
+
+            if b_type == VARIABLE:
+                var_b_val = get_binds(b_val, binds, global_binds)
+                if not var_b_val:
+                    raise ValueError("Undefined variable " + b_val)
+                else:
+                    b_val = var_b_val
+
+            a_val = [(get_binds(v, binds, global_binds) or v) if t == VARIABLE else v for t, v in a_val]
+            b_val = [get_binds(v, binds, global_binds) if t == VARIABLE else v for t, v in b_val]
+            new_binds = destructure(a_val, b_val)
+            if new_binds:
+                binds_so_far = copy.copy(binds)
+                for binding in new_binds:
+                    # side1 doesn't need to be wrapped *internally* because the
+                    # value substituted into the call by `get_binds` isn't ever
+                    # unwrapped! However, it does need to be wrapped on the outside.
+                    side1 = ast_value_wrap(binding[0], False)
+                    side2 = ast_value_wrap(binding[1])
+                    print(side1, side2)
+                    res = unify([side1], [side2], copy.copy(binds_so_far), global_binds)
+                    if res:
+                        binds_so_far = res
+                    else:
+                        return None
+                binds = binds_so_far
+            else:
+                return None
+        elif a_type == LIST and b_type == LIST:
             if len(a_val) != len(b_val):
                 return None
             else:
                 res = unify(a_val, b_val, binds, global_binds)
                 if not res:
                     return None
-        elif b_type == LIST and a_type == VARIABLE:
+        elif (b_type == LIST and a_type == VARIABLE) or (a_type == LIST and b_type == VARIABLE):
+            if b_type == VARIABLE:
+                tmp = a_val
+                a_val = b_val
+                b_val = tmp
+
             a_kval = get_binds(a_val, binds, global_binds)
             if a_kval:
                 new_binds = unify(b_val, a_kval, copy.copy(binds), global_binds)
@@ -63,25 +114,12 @@ def unify(a, b, binds={}, global_binds={}):
                 binds[a_val] = b_val
             else:
                 return None
-        elif a_type == LIST and b_type == VARIABLE:
-            b_kval = get_binds(b_val, binds, global_binds)
-            if b_kval:
-                new_binds = unify(a_val, b_kval, copy.copy(binds), global_binds)
-                if new_binds:
-                    for k,v in new_binds.items():
-                        binds[k] = v
-                else:
-                    return None
-            elif not b_kval:
-                binds[b_val] = a_val
-            else:
-                return None
-        elif a_type == LITERAL and b_type == LITERAL:
-            if a_val == b_val:
-                continue
-            else:
-                return None
-        elif a_type == VARIABLE and b_type == LITERAL:
+        elif (a_type == VARIABLE and b_type == LITERAL) or (b_type == VARIABLE and a_type == LITERAL):
+            if b_type == VARIABLE:
+                tmp = a_val
+                a_val = b_val
+                b_val = tmp
+
             a_kval = get_binds(a_val, binds, global_binds)
             if a_kval and a_kval == b_val:
                 continue
@@ -89,12 +127,9 @@ def unify(a, b, binds={}, global_binds={}):
                 binds[a_val] = b_val
             else:
                 return None
-        elif b_type == VARIABLE and a_type == LITERAL:
-            b_kval = get_binds(b_val, binds, global_binds)
-            if b_kval and b_kval == a_val:
+        elif a_type == LITERAL and b_type == LITERAL:
+            if a_val == b_val:
                 continue
-            elif not b_kval:
-                binds[b_val] = a_val
             else:
                 return None
         elif a_type == VARIABLE and b_type == VARIABLE:
@@ -284,7 +319,7 @@ def create_datatype(e, entities, uuid=""):
             return (LITERAL, entities[number])
         else:
             return (LITERAL, e)
-    elif isinstance(e, str) and e[0].upper() == e[0] and not e[0].isnumeric() and not " " in e:
+    elif is_variable(e):
         if uuid:
             e += uuid
         return (VARIABLE, e)

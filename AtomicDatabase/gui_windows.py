@@ -462,6 +462,7 @@ def draw_imgui_query_box(DB, monospace_font):
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
                 new_query_result = False
+                traceback.print_exc()
 
 
     imgui.push_font(monospace_font)
@@ -483,6 +484,7 @@ def draw_imgui_query_box(DB, monospace_font):
             query_result = None
         except Exception as e:
             query_error = "Excecution Error: " + str(e)
+            traceback.print_exc()
 
     if imgui.button("Add New Entity"):
         imgui.open_popup("add-entity")

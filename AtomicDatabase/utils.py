@@ -1,3 +1,5 @@
+from itertools import groupby
+
 def create_text_entities(string):
     new_str = ""
     in_quot = False
@@ -28,7 +30,6 @@ def eval_expr(val, binds):
     return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
 
 def get_binds(name, binds, global_binds):
-    print(name)
     if name[0] == '*':
         print(global_binds)
         return global_binds.get(name)
@@ -50,3 +51,37 @@ def limit_format(obj):
             return "INF"
         else:
             return str(obj)
+
+def is_variable(e):
+    return isinstance(e, str) and e[0].upper() == e[0] and not e[0].isnumeric() and not " " in e
+
+def is_destructuring_pattern(pat):
+    return (1, "...") in pat or (1, "@") in pat
+
+def destructure(pattern, value):
+    binds = []
+
+    match_vars = []
+    rest_var = None
+    all_var = None
+
+    all_parse = [list(g[1]) for g in groupby(pattern, lambda x: x == "@")]
+    if len(all_parse) == 3:
+        all_var = all_parse[0][0]
+    else:
+        all_parse = [[], [], pattern]
+
+    rest_parse = [list(g[1]) for g in groupby(all_parse[2], lambda x: x == "...")]
+    if len(rest_parse) >= 1:
+        match_vars = rest_parse[0]
+    if len(rest_parse) >= 3:
+        rest_var   = rest_parse[2][0]
+
+    if all_var:
+        binds.append((all_var, value))
+    if rest_var:
+        binds.append((rest_var, value[len(match_vars):]))
+    if len(match_vars) > 0:
+        binds.extend(zip(match_vars, value[:len(match_vars)]))
+
+    return binds
