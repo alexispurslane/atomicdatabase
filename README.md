@@ -78,9 +78,9 @@ My plan looks like this at the moment:
 - [X] Add lists
 - [X] Add list support to attribute metadata
 - [X] Typecheck list internals properly
-- [ ] Add immediate functions and list descturing
+- [X] Add immediate expressions and list descturing
 - [X] Remove dynamic and static scope implementations and use lexical scope based on where things are defined. Make sure nested function calls only get data from their input variables. Create an optional way to access global variables
-- [ ] Make sure rules can call themselves, and check that unification works for recursive functions. Provide a way to iterate through using list destructuring
+- [X] Make sure rules can call themselves, and check that unification works for recursive functions. Provide a way to iterate through using list destructuring
 - [ ] Add automatic conversion to a relational database for export
 - [X] Create a separate entity type to validate with, instead of strings
 - [X] Focus on adding more variety to the NL recognizer
@@ -92,7 +92,7 @@ My plan looks like this at the moment:
       backtracking is visible
 - [ ] Create an entity tree relation graph, and allow entity dropdowns to be
       turned into regular text at the user's convenience.
-- [ ] Create a way to externally save and load plain-test rules and query
+- [X] Create a way to externally save and load plain-test rules and query
       transcripts
 - [X] Allow saving and loading of the database in plaintext
 - [ ] Create a method of making UI elements and interfaces from inside rules
