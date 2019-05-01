@@ -452,6 +452,7 @@ def draw_imgui_query_box(DB, monospace_font):
                 new_query_result = True
             except Exception as e:
                 query_error = "Parse Error: " + str(e)
+                traceback.print_exc()
                 new_query_result = False
         elif query_language ==  1:
             try:

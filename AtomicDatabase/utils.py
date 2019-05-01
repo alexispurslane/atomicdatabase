@@ -27,11 +27,10 @@ def eav_hash(a, b):
     return 0.5*(a + b)*(a + b + 1)+b
 
 def eval_expr(val, binds):
-    return eval(" ".join([str(binds[el]) if el in binds else str(el) for el in val]), {}, {})
+    return eval(" ".join([str(v) for v in val]), {}, binds)
 
 def get_binds(name, binds, global_binds):
     if name[0] == '*':
-        print(global_binds)
         return global_binds.get(name)
     else:
         return binds.get(name)
@@ -87,5 +86,4 @@ def destructure(pattern, value):
     if len(match_vars) > 0:
         binds.extend(zip(match_vars, value[:len(match_vars)]))
 
-    print("DESTRUCTURING BINDS: " + str(binds))
     return binds

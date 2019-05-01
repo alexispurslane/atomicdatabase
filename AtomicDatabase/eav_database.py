@@ -46,14 +46,9 @@ def ast_value_wrap(val, decend=True):
 
 def unify(a, b, binds={}, global_binds={}):
     for i in range(0, min(len(a), len(b))):
+        print(a, b)
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
-        if a_type == EXPR:
-            a_type = LITERAL
-            a_val = eval_expr(a_val, binds)
-        if b_type == EXPR:
-            b_type = LITERAL
-            b_val = eval_expr(b_val, binds)
 
         if (a_type == LIST and is_destructuring_pattern(a_val) and (b_type == LIST or b_type == VARIABLE)) or\
            (b_type == LIST and is_destructuring_pattern(b_val) and (a_type == LIST or a_type == VARIABLE)):
@@ -66,7 +61,7 @@ def unify(a, b, binds={}, global_binds={}):
 
             if b_type == VARIABLE:
                 var_b_val = get_binds(b_val, binds, global_binds)
-                if var_a_val == None:
+                if var_b_val == None:
                     raise ValueError("Undefined variable " + str(b_val))
                 else:
                     b_val = var_b_val
@@ -83,7 +78,6 @@ def unify(a, b, binds={}, global_binds={}):
             a_val = [(get_binds(v, binds, global_binds) or v) if t == VARIABLE else v for t, v in a_val]
             b_val = [get_binds(v, binds, global_binds) if t == VARIABLE else v for t, v in b_val]
             new_binds = destructure(a_val, b_val)
-            print(new_binds)
             if new_binds != None:
                 binds_so_far = copy.copy(binds)
                 for binding in new_binds:
@@ -101,7 +95,6 @@ def unify(a, b, binds={}, global_binds={}):
             else:
                 return None
         elif a_type == LIST and b_type == LIST:
-            print("IN VALS: " + str((a_val, b_val)))
             if len(a_val) != len(b_val):
                 return None
             else:
@@ -118,9 +111,7 @@ def unify(a, b, binds={}, global_binds={}):
 
             a_kval = get_binds(a_val, binds, global_binds)
             if a_kval != None and isinstance(a_kval, list):
-                print("IN VALS: " + str((a_kval, b_val)))
                 new_binds = unify([(b_type, b_val)], [(LIST, a_kval)], copy.copy(binds), global_binds)
-                print("RESULT BINDS: " + str(new_binds))
                 if new_binds != None:
                     binds.update(new_binds)
                 else:
@@ -197,7 +188,10 @@ types = [
 
 def evaluate_rule(db, rule, binds={}, subs={}):
     global types
+
     head, *tail = rule
+    print(head, tail)
+
     max_args = types[head-1]["arg_count"][1]
     min_args = types[head-1]["arg_count"][0]
     if len(tail) < min_args:
@@ -206,6 +200,9 @@ def evaluate_rule(db, rule, binds={}, subs={}):
     elif len(tail) > max_args and max_args != -1:
         raise ValueError("Too many elements in " + types[head-1]["name"] +\
                          "! Expected less than "+str(max_args)+", found " + str(len(tail)) + ".")
+
+    tail = [(LITERAL, eval_expr(e[1], binds)) if e[0] == EXPR else e for e in tail]
+
     if head == PREDICATE:
         was_rule = False
         if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
@@ -301,7 +298,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             yield binds
     elif head == UNIFY:
         new_binds = copy.copy(binds)
-        res = unify(tail[0], tail[1], new_binds, db.global_binds)
+        res = unify([tail[0]], [tail[1]], new_binds, db.global_binds)
         if res != None:
             yield res
     elif head == CONJ_OR:
@@ -356,8 +353,8 @@ def create_rule(lst, entities):
         rule.extend(create_rule(lst[1:], entities)[1:])
     elif lst[0] == "=":
         rule.append(UNIFY)
-        rule.append(create_rule([lst[1]], entities)[1:])
-        rule.append(create_rule(lst[2:], entities)[1:])
+        rule.append(create_rule([lst[1]], entities)[1])
+        rule.append(create_rule(lst[2:], entities)[1])
     else:
         rule.append(PREDICATE)
         in_expr = False
