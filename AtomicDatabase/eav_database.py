@@ -186,6 +186,17 @@ types = [
     { "name": "CONDITION Conjugation", "arg_count": (1, -1) },
 ]
 
+def evaluate_exprs(lst, binds):
+    res = []
+    for e in lst:
+        if e[0] == EXPR:
+            res.append((LITERAL, eval_expr(e[1], binds)))
+        elif e[0] == LIST:
+            res.append((LIST, evaluate_exprs(e[1])))
+        else:
+            res.append(e)
+    return res
+
 def evaluate_rule(db, rule, binds={}, subs={}):
     global types
 
@@ -201,7 +212,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         raise ValueError("Too many elements in " + types[head-1]["name"] +\
                          "! Expected less than "+str(max_args)+", found " + str(len(tail)) + ".")
 
-    tail = [(LITERAL, eval_expr(e[1], binds)) if e[0] == EXPR else e for e in tail]
+    tail = evaluate_exprs(tail, binds)
 
     if head == PREDICATE:
         was_rule = False
