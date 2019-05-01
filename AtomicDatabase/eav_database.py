@@ -46,7 +46,6 @@ def ast_value_wrap(val, decend=True):
 
 def unify(a, b, binds={}, global_binds={}):
     for i in range(0, min(len(a), len(b))):
-        print(a, b)
         (a_type, a_val) = a[i]
         (b_type, b_val) = b[i]
 
@@ -197,6 +196,11 @@ def evaluate_exprs(lst, binds):
             res.append(e)
     return res
 
+SPECIAL_RULES = {
+    "print": lambda tail: print("Internal AD Log: " + str([e[1] for e in tail])),
+}
+
+
 def evaluate_rule(db, rule, binds={}, subs={}):
     global types
 
@@ -216,8 +220,8 @@ def evaluate_rule(db, rule, binds={}, subs={}):
 
     if head == PREDICATE:
         was_rule = False
-        if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules):
-            rule = db.rules[tail[1][1]]
+        if tail[1][0] == LITERAL and not (tail[1][1] in db.entities) and (tail[1][1] in db.rules or tail[1][1] in SPECIAL_RULES):
+            name = tail[1][1]
             was_rule = True
 
             tail = [(LITERAL, binds[name])
@@ -225,30 +229,41 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                     else (tpe, name)
                     for tpe, name in tail]
 
-            if len(tail) - 1 != len(rule["args"]):
-                raise ValueError("Wrong number of arguments in " + rule["name"].upper() +\
-                                 " Rule! Expected "+str(len(rule["args"]))+", found " + str(len(tail)) + ".")
+            sr = SPECIAL_RULES.get(name)
+            if sr:
+                res = sr(tail)
+                if res:
+                    yield from res
+                else:
+                    yield binds
+            else:
+                rule = db.rules[name]
+                if len(tail) - 1 != len(rule["args"]):
+                    raise ValueError("Wrong number of arguments in " + rule["name"].upper() +\
+                                     " Rule! Expected "+str(len(rule["args"]))+", found " + str(len(tail)) + ".")
 
-            var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
-            params = var_names[:1] + var_names[2:]
-            substitutions = dict(zip(rule["args"], params))
+                var_names = [name if tpe == VARIABLE else None for (tpe, name) in tail]
+                params = var_names[:1] + var_names[2:]
+                substitutions = dict(zip(rule["args"], params))
 
-            lit_vals = [val if tpe == LITERAL or tpe == LIST else None for (tpe, val) in tail]
-            inputs = lit_vals[:1] + lit_vals[2:]
-            input_binds = { k: v for k, v in zip(rule["args"], inputs) if v != None }
+                lit_vals = [val if tpe == LITERAL or tpe == LIST else None for (tpe, val) in tail]
+                inputs = lit_vals[:1] + lit_vals[2:]
+                input_binds = { k: v for k, v in zip(rule["args"], inputs) if v != None }
 
-            print("CALL RULE:\t" + tail[1][1])
-            print("PARAMS:\t" + str(params))
-            print("ARGS:\t" + str(rule["args"]))
-            print("BINDINGS: " + str(input_binds))
+                print("CALL RULE:\t" + tail[1][1])
+                print("PARAMS:\t" + str(params))
+                print("ARGS:\t" + str(rule["args"]))
+                print("BINDINGS: " + str(input_binds))
 
-            for res in evaluate_rule(db, rule["body"], input_binds, subs=substitutions):
-                output_binds = { substitutions[key]: value for key, value in res.items() if key in substitutions and substitutions[key] }
-                for key, value in binds.items():
-                    if not key in output_binds:
-                        output_binds[key] = value
+                for res in evaluate_rule(db, rule["body"], input_binds, subs=substitutions):
+                    output_binds = { substitutions[key]: value
+                                     for key, value in res.items()
+                                     if key in substitutions and substitutions[key] }
+                    for key, value in binds.items():
+                        if not key in output_binds:
+                            output_binds[key] = value
 
-                yield output_binds
+                    yield output_binds
 
         if not was_rule:
             if len(tail) < 3:
