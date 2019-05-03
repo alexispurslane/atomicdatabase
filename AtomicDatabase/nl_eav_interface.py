@@ -23,7 +23,6 @@ PATTERNS = {
     "ReversePredicate": [
         {'DEP': 'nsubj'},
         {'LEMMA': 'be'},
-        {'POS': 'DET', 'OP': '*'},
         {'DEP': 'attr'},
         {'DEP': 'prep'},
         {'DEP': 'pobj'},
@@ -36,7 +35,6 @@ PATTERNS = {
         {'DEP': {'IN': ['attr', 'acomp']}}
     ],
     "Predicate": [
-        {'POS': 'DET', 'OP': '*'},
         {'DEP': 'nsubj'},
         {'DEP': 'prep'},
         {'DEP': 'pobj'},
@@ -152,9 +150,17 @@ def recursive_map(constarg, fun, lst):
             res.append(fun(constarg, item))
     return res
 
+RULE_IDS = {
+    '&': eav_database.CONJ_AND,
+    '|': eav_database.CONJ_OR,
+}
+
 def run_nlp(constarg, string):
     (matcher, nlp) = constarg
-    doc = nlp(string)
+    if string in RULE_IDS:
+        return string
+
+    doc = nlp("".join([t.text_with_ws for t in nlp(string) if t.pos_ != "DET"]))
     mat = get_matches(matcher(doc), doc)
     if len(mat) > 0:
         return mat[-1]
@@ -169,11 +175,6 @@ def understand_predicate(nlp, matcher, string):
 
     # No multiline lambdas means no closures, so i have to implement them manually
     return recursive_map((matcher, nlp), run_nlp, conjugation_groups), entities
-
-RULE_IDS = {
-    '&': eav_database.CONJ_AND,
-    '|': eav_database.CONJ_OR,
-}
 
 def create_type(s, entities, uuid=""):
     try:
@@ -204,37 +205,38 @@ def convert_match_to_rule(consts, match):
         print(pattern, lst)
         (entity, attribute, value) = (None, None, None)
         if pattern == 'SimpleQuery':
-            entity = [x.text for x in lst if x.dep_ == 'poss']
-            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value = ['Result']
+            entity = [x.text for x in lst if x.dep_ == 'poss'][0]
+            attribute = [x.text for x in lst if x.dep_ in ['nsubj', 'attr']][-1]
+            value = 'Result'
         elif pattern == 'PredicateContraction':
-            entity    = [x.text for x in lst if x.dep_ == 'poss']
-            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value     = [x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'acomp']
+            entity    = [x.text for x in lst if x.dep_ == 'poss'][0]
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj'][0]
+            value     = [x.text for x in lst if x.dep_ in ['attr', 'acomp']][-1]
         elif pattern == 'ReversePredicate':
-            entity    = [x.text for x in lst if x.dep_ == 'pobj']
-            attribute = [x.text for x in lst if x.dep_ == 'attr']
-            value     = [x.text for x in lst if x.dep_ == 'nsubj']
+            entity    = [x.text for x in lst if x.dep_ == 'pobj'][-1]
+            attribute = [x.text for x in lst if x.dep_ == 'attr'][-1]
+            value     = [x.text for x in lst if x.dep_ == 'nsubj'][0]
         elif pattern == 'Predicate':
-            entity    = [x.text for x in lst if x.dep_ == 'pobj']
-            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value     = [x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'acomp']
+            entity    = [x.text for x in lst if x.dep_ == 'pobj'][0]
+            attribute = [x.text for x in lst if x.dep_ == 'nsubj'][0]
+            value     = [x.text for x in lst if x.dep_ in ['attr', 'acomp']][-1]
         elif pattern == 'ReverseSimpleQuery':
-            entity    = [x.text for x in lst if x.dep_ == 'pobj']
-            attribute = [x.text for x in lst if x.dep_ == 'nsubj']
-            value = ['Result']
+            entity    = [x.text for x in lst if x.dep_ == 'pobj'][-1]
+            attribute = [x.text for x in lst if x.dep_ in ['nsubj', 'attr']][-1]
+            value = 'Result'
         elif pattern == 'FindEntitySimpleQuery':
-            entity    = ['Result']
-            attribute = [x.text for x in lst if x.dep_ == 'dobj']
-            value = [x.text for x in lst if x.dep_ == 'pobj']
+            entity    = 'Result'
+            attribute = [x.text for x in lst if x.dep_ == 'dobj'][-1]
+            value = [x.text for x in lst if x.dep_ == 'pobj'][-1]
         elif pattern == 'FindEntitySimpleQueryContraction':
-            entity    = ['Result']
-            attribute = [[x.text for x in lst if x.dep_ == 'attr'][0]]
-            value = [[x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'ROOT'][2]]
+            entity    = 'Result'
+            attribute = [[x.text for x in lst if x.dep_ == 'attr'][0]][-1]
+            value = [[x.text for x in lst if x.dep_ == 'attr' or x.dep_ == 'ROOT'][2]][-1]
 
         if entity != None and attribute != None and value != None:
             args = [entity, attribute, value]
-            return [eav_database.PREDICATE, *[create_type(x[0], entities, uuid) for x in args]]
+            print(args)
+            return [eav_database.PREDICATE, *[create_type(x, entities, uuid) for x in args]]
     elif isinstance(match, str) and match in RULE_IDS:
         return RULE_IDS[match]
     else:

@@ -23,6 +23,9 @@ SHOW_VARS = {
     'CONST': False
 }
 
+nlp = spacy.load("en_core_web_sm")
+matcher = nl.create_matcher(nlp)
+
 #  ____  _                 _         ____                                             _
 # / ___|(_)_ __ ___  _ __ | | ___   / ___|___  _ __ ___  _ __   ___  _ __   ___ _ __ | |_ ___
 # \___ \| | '_ ` _ \| '_ \| |/ _ \ | |   / _ \| '_ ` _ \| '_ \ / _ \| '_ \ / _ \ '_ \| __/ __|
@@ -596,6 +599,7 @@ def draw_imgui_database_rules(DB, monospaced_font):
                         rule_error = ""
                     except Exception as e:
                         rule_error = str(e)
+                        traceback.print_exc()
 
                 DB.add_rule(name, rule_args, {
                     "lang": rule_lang,

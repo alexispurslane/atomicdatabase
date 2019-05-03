@@ -21,8 +21,6 @@ DB = eav.EAVDatabase()
 if len(sys.argv) > 1:
     DB = eav.load_from_file(sys.argv[1])
     database_name = sys.argv[1]
-nlp = spacy.load("en_core_web_sm")
-matcher = nl.create_matcher(nlp)
 
 def time_left(next_time):
     now = SDL_GetTicks()

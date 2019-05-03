@@ -10,7 +10,12 @@ import copy
 import inspect
 import pickle
 import json
+from tco import tail_call_optimized
+from functools import wraps
 
+import resource, sys
+resource.setrlimit(resource.RLIMIT_STACK, (2**29, -1))
+sys.setrecursionlimit(10**6)
 
 #  ____  _____ _       _____             _
 # / ___|| ____| |     | ____|_ __   __ _(_)_ __   ___
@@ -66,13 +71,8 @@ def unify(a, b, binds={}, global_binds={}):
                     b_val = var_b_val
 
             if is_destructuring_pattern(b_val):
-                tmp = a_val
-                a_val = b_val
-                b_val = tmp
-
-                tmp = a_type
-                a_type = b_type
-                b_type = tmp
+                a_val, b_val = b_val, a_val
+                a_type, b_type = b_type, a_type
 
             a_val = [(get_binds(v, binds, global_binds) or v) if t == VARIABLE else v for t, v in a_val]
             b_val = [get_binds(v, binds, global_binds) if t == VARIABLE else v for t, v in b_val]
@@ -104,9 +104,8 @@ def unify(a, b, binds={}, global_binds={}):
                     binds = res
         elif (b_type == LIST and a_type == VARIABLE) or (a_type == LIST and b_type == VARIABLE):
             if b_type == VARIABLE:
-                tmp = a_val
-                a_val = b_val
-                b_val = tmp
+                a_val, b_val = b_val, a_val
+                a_type, b_type = b_type, a_type
 
             a_kval = get_binds(a_val, binds, global_binds)
             if a_kval != None and isinstance(a_kval, list):
@@ -121,9 +120,8 @@ def unify(a, b, binds={}, global_binds={}):
                 return None
         elif (a_type == VARIABLE and b_type == LITERAL) or (b_type == VARIABLE and a_type == LITERAL):
             if b_type == VARIABLE:
-                tmp = a_val
-                a_val = b_val
-                b_val = tmp
+                a_val, b_val = b_val, a_val
+                a_type, b_type = b_type, a_type
 
             a_kval = get_binds(a_val, binds, global_binds)
             if a_kval != None and a_kval == b_val:
@@ -152,20 +150,14 @@ def unify(a, b, binds={}, global_binds={}):
     return binds
 
 def evaluate_cond_rule(db, branches, binds={}, subs={}):
-    if branches == []:
-        return None
-    else:
-        head, *tail = branches
-        print("COND BRANCH: " + str(head))
-        print("BINDS: " + str(binds))
-        ret = evaluate_rule(db, head, binds, subs)
+    for branch in branches:
+        ret = evaluate_rule(db, branch, binds, subs)
         try:
             fst = next(ret)
-            print("RESULT: " + str(fst))
             yield from chain([fst], ret)
+            break
         except StopIteration:
-            print("No stuff")
-            yield from evaluate_cond_rule(db, tail, binds, subs)
+            continue
 
 def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
     if and_clauses == []:
@@ -249,10 +241,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                 inputs = lit_vals[:1] + lit_vals[2:]
                 input_binds = { k: v for k, v in zip(rule["args"], inputs) if v != None }
 
-                print("CALL RULE:\t" + tail[1][1])
-                print("PARAMS:\t" + str(params))
-                print("ARGS:\t" + str(rule["args"]))
-                print("BINDINGS: " + str(input_binds))
+                print("STACK DEPTH: " + str(len(inspect.stack())))
 
                 for res in evaluate_rule(db, rule["body"], input_binds, subs=substitutions):
                     output_binds = { substitutions[key]: value
@@ -298,7 +287,6 @@ def evaluate_rule(db, rule, binds={}, subs={}):
                 if val != None:
                     vals.append(val)
                 else:
-                    print("BINDS AT ERROR: " + str(binds))
                     raise ValueError("Undefined variable " + e[1] + "!")
             else:
                 vals.append(e[1])
@@ -331,7 +319,6 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
     elif head == CONJ_COND:
-        print("COND BODY: " + str(tail))
         yield from evaluate_cond_rule(db, tail, binds, subs)
     elif head == CONJ_AND:
         yield from evaluate_and_rule(db, tail, binds, subs)
@@ -486,7 +473,6 @@ class EAVDatabase:
         return forein_attr
 
     def add(self, eav):
-        print("New data added: " + str(eav))
         (entity, attr, value) = eav
         forein_entity = self.get_or_add_entity_id(entity)
         forein_attr = self.get_or_add_attribute_id(attr)
