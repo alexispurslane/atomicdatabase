@@ -197,7 +197,7 @@ def evaluate_exprs(lst, binds):
     return res
 
 SPECIAL_RULES = {
-    "print": lambda tail: print("Internal AD Log: " + str([e[1] for e in tail])),
+    "print": lambda tail: print("\nInternal AD Log: " + " ".join([str(e[1]) for e in tail])),
 }
 
 
@@ -205,7 +205,6 @@ def evaluate_rule(db, rule, binds={}, subs={}):
     global types
 
     head, *tail = rule
-    print(head, tail)
 
     max_args = types[head-6]["arg_count"][1]
     min_args = types[head-6]["arg_count"][0]
@@ -296,17 +295,18 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         for e in args:
             if e[0] == VARIABLE:
                 val = get_binds(e[1], binds, db.global_binds)
-                if val:
+                if val != None:
                     vals.append(val)
                 else:
-                    raise ValueError("Undefined variable " + val[1] + "!")
+                    print("BINDS AT ERROR: " + str(binds))
+                    raise ValueError("Undefined variable " + e[1] + "!")
             else:
                 vals.append(e[1])
         failed = False
         last = None
         for v in vals:
             choice = False
-            if last:
+            if last != None:
                 if op == "<":
                     choice = v > last
                 elif op == ">":
@@ -393,7 +393,6 @@ def create_rule(lst, entities):
                 in_expr = False
                 rule.append((EXPR, expr))
             elif in_expr:
-                print("IN EXPR: " + str(e))
                 expr.append(e)
             else:
                 rule.append(create_datatype(e, entities))
