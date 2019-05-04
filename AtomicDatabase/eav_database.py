@@ -303,13 +303,12 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             except StopIteration:
                 continue
     elif head == CONJ_AND:
-        possibilities = [copy.copy(binds)]
+        possibilities = iter([copy.copy(binds)])
         for clause in tail:
-            new_possibilities = []
-            while len(possibilities) > 0:
-                p = possibilities.pop()
-                new_possibilities.extend(evaluate_rule(db, clause, p, subs))
-            possibilities.extend(new_possibilities)
+            new_possibilities = iter(())
+            for p in possibilities:
+                new_possibilities = chain(new_possibilities, evaluate_rule(db, clause, p, subs))
+            possibilities = chain(possibilities, new_possibilities)
         yield from possibilities
         # if and_clauses == []:
         #     yield binds
