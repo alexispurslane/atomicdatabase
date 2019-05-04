@@ -257,13 +257,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             if len(tail) < 3:
                 raise ValueError("Not enough elements in PREDICATE" + \
                                  "! Expected at least 3, found " + str(len(tail)) + ".")
-            if tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == VARIABLE:
-                res = db.get_value(tail[0][1], tail[1][1])
-                if res:
-                    new_binds = copy.copy(binds)
-                    new_binds[tail[2][1]] = res
-                    yield new_binds
-            elif tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
+            if tail[0][0] == LITERAL and tail[1][0] == LITERAL and tail[2][0] == LITERAL:
                 res = db.get_value(tail[0][1], tail[1][1])
                 if res and res == tail[2][1]:
                     yield binds
