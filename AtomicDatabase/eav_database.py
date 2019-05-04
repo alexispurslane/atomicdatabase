@@ -149,25 +149,6 @@ def unify(a, b, binds={}, global_binds={}):
                 return None
     return binds
 
-def evaluate_cond_rule(db, branches, binds={}, subs={}):
-    for branch in branches:
-        ret = evaluate_rule(db, branch, binds, subs)
-        try:
-            fst = next(ret)
-            yield from chain([fst], ret)
-            break
-        except StopIteration:
-            continue
-
-def evaluate_and_rule(db, and_clauses, binds={}, subs={}):
-    if and_clauses == []:
-        yield binds
-    else:
-        head, *tail = and_clauses
-        possible = evaluate_rule(db, head, binds, subs)
-        for p in possible:
-            yield from evaluate_and_rule(db, tail, p, subs)
-
 types = [
     { "name": "OR Conjugation", "arg_count": (1, -1) },
     { "name": "AND Conjugation", "arg_count": (1, -1) },
@@ -189,7 +170,7 @@ def evaluate_exprs(lst, binds):
     return res
 
 SPECIAL_RULES = {
-    "print": lambda tail: print("\nInternal AD Log: " + " ".join([str(e[1]) for e in tail])),
+    "print": lambda tail: print("\nInternal AD Log: " + str(tail[-1])),
 }
 
 
@@ -313,9 +294,30 @@ def evaluate_rule(db, rule, binds={}, subs={}):
         for tail_x in tail:
             yield from evaluate_rule(db, tail_x, copy.copy(binds), subs)
     elif head == CONJ_COND:
-        yield from evaluate_cond_rule(db, tail, binds, subs)
+        for branch in tail:
+            ret = evaluate_rule(db, branch, copy.copy(binds), subs)
+            try:
+                fst = next(ret)
+                yield from chain([fst], ret)
+                break
+            except StopIteration:
+                continue
     elif head == CONJ_AND:
-        yield from evaluate_and_rule(db, tail, binds, subs)
+        possibilities = [copy.copy(binds)]
+        for clause in tail:
+            new_possibilities = []
+            while len(possibilities) > 0:
+                p = possibilities.pop()
+                new_possibilities.extend(evaluate_rule(db, clause, p, subs))
+            possibilities.extend(new_possibilities)
+        yield from possibilities
+        # if and_clauses == []:
+        #     yield binds
+        # else:
+        #     head, *tail = and_clauses
+        #     possible = evaluate_rule(db, head, binds, subs)
+        #     for p in possible:
+        #        yield from evaluate_and_rule(db, tail, p, subs)
 
 def clean_symbol(e):
     if isinstance(e, Symbol):
