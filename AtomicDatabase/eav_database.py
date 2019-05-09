@@ -173,6 +173,14 @@ SPECIAL_RULES = {
     "print": lambda tail: print("\nInternal AD Log: " + str(tail[-1])),
 }
 
+def evaluate_and_rule(db, and_clauses, binds, subs):
+    if and_clauses == []:
+        yield binds
+    else:
+        head, *tail = and_clauses
+        possible = evaluate_rule(db, head, binds, subs)
+        for p in possible:
+            yield from evaluate_and_rule(db, tail, p, subs)
 
 def evaluate_rule(db, rule, binds={}, subs={}):
     global types
@@ -303,20 +311,7 @@ def evaluate_rule(db, rule, binds={}, subs={}):
             except StopIteration:
                 continue
     elif head == CONJ_AND:
-        possibilities = iter([copy.copy(binds)])
-        for clause in tail:
-            new_possibilities = iter(())
-            for p in possibilities:
-                new_possibilities = chain(new_possibilities, evaluate_rule(db, clause, p, subs))
-            possibilities = chain(possibilities, new_possibilities)
-        yield from possibilities
-        # if and_clauses == []:
-        #     yield binds
-        # else:
-        #     head, *tail = and_clauses
-        #     possible = evaluate_rule(db, head, binds, subs)
-        #     for p in possible:
-        #        yield from evaluate_and_rule(db, tail, p, subs)
+        yield from evaluate_and_rule(db, tail, binds, subs)
 
 def clean_symbol(e):
     if isinstance(e, Symbol):
