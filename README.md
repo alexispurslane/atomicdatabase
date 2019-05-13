@@ -153,6 +153,6 @@ Also coming soon!
 
 ## Contributing
 
-If you want to contribute, **awesome**! Please fork the project and do PRs from
-there. Never commit broken code (if you know its broken) as a rule. If you have
-questions, you can open issues for them, I'll make a documentation label.
+If you want to contribute, **awesome**! The only rule is: never commit broken
+code (if you know its broken). If you have questions, you can open issues for
+them, I'll make a documentation label.
