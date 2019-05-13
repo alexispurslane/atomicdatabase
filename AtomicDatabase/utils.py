@@ -55,7 +55,8 @@ def is_variable(e):
     return isinstance(e, str) and e[0].upper() == e[0] and not e[0].isnumeric() and not " " in e
 
 def is_destructuring_pattern(pat):
-    return (1, "...") in pat or (1, "@") in pat
+    pat = [x[1] for x in pat]
+    return "..." in pat or "@" in pat
 
 def destructure(pattern, value):
     binds = []
