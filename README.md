@@ -84,6 +84,10 @@ My plan looks like this at the moment:
 - [ ] Add automatic conversion to a relational database for export
 - [X] Create a separate entity type to validate with, instead of strings
 - [X] Focus on adding more variety to the NL recognizer
+- [ ] Create a proper parser/evaluator for expressions, instead of `eval`ing them.
+- [ ] Add immediate functions (that work inside expression delimiters) and can
+      also be added as rows/columns to the Table View, so that it works like a
+      spreadsheet.
 - [ ] Extend the natural language interface to support some (all if possible!)
       advanced language constructs
 - [ ] Create a chatbot (or "repl") interface for adding data and querying the
@@ -100,6 +104,22 @@ My plan looks like this at the moment:
 
 ## Requirements
 
+You can use the `setup.rb` script provided in the home directory to install the
+program files to `/opt` and the `atomicdb` script to `/usr/local/bin`. The
+`atomicdb` script just excecutes the files in `/opt`. Note that running
+`./setup.rb` by itself gives you a summary of what each command does:
+
+```
+You need to supply setup.rb with a command to tell it what to do!
+Available commands:
+
+    install         -- physically install Atomic Database (as atomicdb) to your computer
+    develop         -- symlink Atomic Database so it runs as if it were `install`ed
+    uninstall       -- undo all of the things develop or install did
+
+Choose one of these commands please.
+```
+
 The requirements are stored in [requirements.txt](requirements.txt), generated
 by `pip freeze`. The main packages you have to install if you can't use the
 `requirements.txt` are:
@@ -108,11 +128,19 @@ by `pip freeze`. The main packages you have to install if you can't use the
     * Which you can install by doing `python -m download en_core_web_sm` after
       you've installed spaCy
 - `imgui[full]`
+- `sexpdata`
+- You will also need to install SDL2
 
 To run, use:
 
 ```
 python3 AtomicDatabase/__main__.py <name of database, or nothing>
+```
+
+Or, if you've used `setup.rb` to install/link the program, you can use:
+
+```
+atomicdb <name of database, or nothing>
 ```
 
 ## Screenshots
