@@ -420,8 +420,10 @@ class EAVDatabase:
             (data["type"] == 2 or data["type"] == 3) and between_limits(value, data["num_limits"])
 
         custom_message = ""
-        if data["type"] == 0 and data["type"] == 1:
+        if data["type"] == 0:
             custom_message = " from: " + limit_format(self.entities) + "..."
+        elif data["type"] == 1:
+            custom_message = " from: " + limit_format(data["allowed_strings"])
         elif data["type"] == 2 or data["type"] == 3 and data["num_limits"]:
             custom_message = " between " + limit_format(data["num_limits"][0]) + " and " +\
                 limit_format(data["num_limits"][1]) + " (inclusive)"
@@ -440,7 +442,7 @@ class EAVDatabase:
         }):
         new_rule.update({
             "name": name,
-            "args": [arg for arg in rule_args],
+            "args": rule_args,
         })
         self.rules[name] = new_rule
 

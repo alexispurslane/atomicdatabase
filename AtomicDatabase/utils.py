@@ -43,13 +43,15 @@ def peek(iterable):
     return chain([first], iterable)
 
 def limit_format(obj):
-    if isinstance(obj, list):
+    if isinstance(obj, list) and len(obj) > 0:
         return ", ".join(obj[:3])
     elif isinstance(obj, (int, float)):
         if obj == -1:
-            return "INF"
+            return "<INF>"
         else:
             return str(obj)
+    else:
+        return "<any string>"
 
 def is_variable(e):
     return isinstance(e, str) and e[0].upper() == e[0] and not e[0].isnumeric() and not " " in e
