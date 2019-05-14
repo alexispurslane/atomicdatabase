@@ -10,7 +10,6 @@ import copy
 import inspect
 import pickle
 import json
-from tco import tail_call_optimized
 from functools import wraps
 
 import resource, sys

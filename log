@@ -1,8 +1,0 @@
-Load from: test.db.json
-Added ReversePredicate pattern.
-Added PredicateContraction pattern.
-Added Predicate pattern.
-Added SimpleQuery pattern.
-Added ReverseSimpleQuery pattern.
-Added FindEntitySimpleQuery pattern.
-Added FindEntitySimpleQueryContraction pattern.

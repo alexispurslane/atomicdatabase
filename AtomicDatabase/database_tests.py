@@ -90,5 +90,54 @@ class TestEAVDatabase(unittest.TestCase):
         self.assertEqual(self.db.get_value("cool@gmail.com", "name"), "Joe Cool")
         self.assertIsNone(self.db.get_value("cool@gmail.com", "boogaloo"))
 
+
+class TestSELEngine(unittest.TestCase):
+    def test_unification_with_variables(self):
+        binds = {}
+        self.assertEqual(e.unify([(e.VARIABLE, 'X')], [(e.LITERAL, 1)], binds), { 'X': 1 })
+        self.assertEqual(e.unify([(e.VARIABLE, 'Y')], [(e.VARIABLE, 'X')], binds), { 'X': 1, 'Y': 1 })
+        self.assertEqual(e.unify([(e.VARIABLE, 'X')], [(e.VARIABLE, 'Z')], binds), { 'X': 1, 'Y': 1, 'Z': 1 })
+        self.assertEqual(e.unify([(e.VARIABLE, 'X')], [(e.VARIABLE, 'Z')], binds), { 'X': 1, 'Y': 1, 'Z': 1 })
+        self.assertEqual(e.unify([(e.VARIABLE, 'Y')], [(e.VARIABLE, 'Z')], binds), { 'X': 1, 'Y': 1, 'Z': 1 })
+        self.assertIsNone(e.unify([(e.LITERAL, 2)], [(e.VARIABLE, 'Z')], binds))
+        self.assertEqual(e.unify([(e.LITERAL, 99)], [(e.VARIABLE, 'A')], {}), { 'A': 99 })
+
+    def test_unification_with_literals(self):
+        binds = {}
+        self.assertIsNotNone(e.unify([(e.LITERAL, 2)], [(e.LITERAL, 2)]))
+        self.assertIsNotNone(e.unify([(e.LITERAL, "foo")], [(e.LITERAL, "foo")]))
+        self.assertIsNone(e.unify([(e.LITERAL, "foo")], [(e.LITERAL, 2)]))
+        self.assertIsNone(e.unify([(e.LITERAL, "foo")], [(e.LITERAL, "bar")]))
+        self.assertIsNone(e.unify([(e.LITERAL, 3)], [(e.LITERAL, 2)]))
+
+    def test_unification_with_lists(self):
+        self.assertEqual(e.unify([(e.LIST, [(e.VARIABLE, 'X'), (e.LITERAL, 2), (e.LITERAL, 3)])],
+                                 [(e.LIST, [(e.LITERAL, 1),    (e.LITERAL, 2), (e.LITERAL, 3)])], {}), { 'X': 1 })
+        self.assertEqual(e.unify([(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 2), (e.LITERAL, 3)])],
+                                 [(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 2), (e.LITERAL, 3)])], {}), {})
+        self.assertIsNone(e.unify([(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 2), (e.LITERAL, 'Z')])],
+                                  [(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 3), (e.LITERAL, 2)])], {}))
+        self.assertEqual(e.unify([(e.LIST, [(e.LITERAL, 1), (e.VARIABLE, 'Z'), (e.VARIABLE, 'Z')])],
+                                 [(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 2), (e.LITERAL, 2)])], {}), { 'Z': 2 })
+        self.assertIsNone(e.unify([(e.LIST, [(e.LITERAL, 1), (e.VARIABLE, 'Z'), (e.VARIABLE, 'Z')])],
+                                  [(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 3), (e.LITERAL, 2)])], {}))
+
+        self.assertEqual(e.unify([(e.LIST, [(e.LITERAL, 1),    (e.LITERAL, 2), (e.LITERAL, 3)])],
+                                 [(e.LIST, [(e.VARIABLE, 'X'), (e.LITERAL, 2), (e.LITERAL, 3)])], {}), { 'X': 1 })
+        self.assertEqual(e.unify([(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 2), (e.LITERAL, 2)])],
+                                 [(e.LIST, [(e.LITERAL, 1), (e.VARIABLE, 'Z'), (e.VARIABLE, 'Z')])], {}), { 'Z': 2 })
+        self.assertIsNone(e.unify([(e.LIST, [(e.LITERAL, 1), (e.LITERAL, 3), (e.LITERAL, 2)])],
+                                  [(e.LIST, [(e.LITERAL, 1), (e.VARIABLE, 'Z'), (e.VARIABLE, 'Z')])],
+                                  {}))
+
+    def test_unification_with_destructuring(self):
+        pass
+
+    def test_create_rule(self):
+        pass
+
+    def test_evaluation(self):
+        pass
+
 if __name__ == '__main__':
     unittest.main()

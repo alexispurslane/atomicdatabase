@@ -159,10 +159,10 @@ def impl_pysdl2_init():
 def run():
     global DB, database_name, TICK_INTERVAL, show_meta_attr, show_rules_db, show_eav_db, show_table_db
     font_extra = imgui.get_io().fonts.add_font_from_file_ttf(
-        "AtomicDatabase/Roboto-Light.ttf", 20
+        "Fonts/Roboto-Light.ttf", 20
     )
     font_extra2 = imgui.get_io().fonts.add_font_from_file_ttf(
-        "AtomicDatabase/RobotoMono-Light.ttf", 20
+        "Fonts/RobotoMono-Light.ttf", 20
     )
     window, gl_context = impl_pysdl2_init()
     renderer = SDL2Renderer(window)
