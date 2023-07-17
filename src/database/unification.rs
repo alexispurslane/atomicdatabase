@@ -2,7 +2,7 @@ use std::{collections::HashMap, iter::empty, pin::Pin, sync::Arc};
 
 use crate::database::backtracking::BacktrackingQuery;
 
-use super::{evaluator::VariableName, DBValue, Database};
+use super::{parser::VariableName, DBValue, Database};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum GlobPosition {

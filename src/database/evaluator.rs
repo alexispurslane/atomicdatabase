@@ -8,50 +8,51 @@ use super::{
 
 pub type VariableName = String;
 
-pub fn tokenize(line: String) -> Vec<String> {
-    line.split_whitespace()
-        .map(|s| s.to_owned())
-        .collect::<Vec<String>>()
+pub fn char_starts_token(i: usize, c: char, sign: Sign) -> Value {
+    if c.is_alphabetic() && c.is_uppercase() {
+        Value::Variable(c.to_string())
+    } else if c.is_alphabetic() && c.is_lowercase() {
+        Value::Literal(DBValue::RelationID(c.to_string()))
+    } else if c == '\"' || c == '\'' {
+        Value::Literal(DBValue::Text(c.to_string()))
+    } else if c.is_numeric() {
+        Value::Literal(DBValue::Number(BigInt::new(sign, vec![c.to_digit(10)])))
+    } else if c == '.' {
+        Value::Literal(DBValue::Float(0, 0))
+    } else if c == '[' {
+        Value::Literal(DBValue::List(vec![]))
+    } else if c == '{' {
+        Value::PatternMatch {
+            explicit_values: vec![],
+            is_glob: false,
+            glob_position: super::unification::GlobPosition::Middle,
+        }
+    } else {
+        panic!("Unknown char `{}` at column `{}`", c, i);
+    }
 }
 
-pub fn parse_token(tok: &str) -> Result<Value, String> {
-    let text = regex_captures!(r#"\"([^\"]*)\""#, tok);
-    let number = regex_captures!(r#"(\+|\-)?(\d+)"#, tok);
-    let float = regex_captures!(r#"(\+|\-)?(\d*)\.(\d)"#, tok);
-    let variable = regex_captures!(r#"([A-Z][a-zA-Z0-9_]*)"#, tok);
-    let relation = regex_captures!(r#"(\w+)"#, tok);
-    if let Some((_, string)) = text {
-        Ok(Value::Literal(DBValue::Text(string.to_string())))
-    } else if let Some((_, sign, digits)) = number {
-        let sign = match sign {
-            "+" => Sign::Plus,
-            "-" => Sign::Minus,
-            _ => Sign::NoSign,
-        };
-        Ok(Value::Literal(DBValue::Number(BigInt::new(
-            sign,
-            digits.chars().filter_map(|c| c.to_digit(10)).collect(),
-        ))))
-    } else if let Some((_, sign, digits, decimals)) = float {
-        let sign = match sign {
-            "+" => Sign::Plus,
-            "-" => Sign::Minus,
-            _ => Sign::NoSign,
-        };
-        Ok(Value::Literal(DBValue::Float(
-            BigInt::new(
-                sign,
-                digits.chars().filter_map(|c| c.to_digit(10)).collect(),
-            ),
-            BigUint::new(decimals.chars().filter_map(|c| c.to_digit(10)).collect()),
-        )))
-    } else if let Some((_, varname)) = variable {
-        Ok(Value::Variable(varname.to_string()))
-    } else if let Some((_, relID)) = relation {
-        Ok(Value::Literal(DBValue::RelationID(relID.to_uppercase())))
-    } else {
-        Err(format!("Cannot parse token: `{}`", tok))
+pub fn parse_line(line: String) -> Vec<Value> {
+    let mut tokens = vec![];
+    let mut current_token = None;
+    let mut list_tokens = vec![];
+    let mut digits = vec![];
+    let mut sign = Sign::NoSign;
+
+    for (i, c) in line.chars().enumerate() {
+        match current_token {
+            None => {
+                current_token = Some(char_starts_token(i, c, sign));
+            }
+            Some(Value::Variable(s)) => {
+                if c.is_alphanumeric() {
+                    s.push(c);
+                } else if c.is_whitespace() || c == ',' || c == '[' || c == '{' {
+                }
+            }
+        }
     }
+    tokens
 }
 
 pub fn parse_query(tokens: Vec<String>) -> Result<Constraint, String> {
@@ -83,7 +84,7 @@ pub fn parse_query(tokens: Vec<String>) -> Result<Constraint, String> {
         let mut parsed_tokens = vec![];
         for tok in tokens {
             let parsed_tok = parse_token(&tok)?;
-            parsed_tokens.push(parsed_tok);
+            parsed_current_token = parsed_tok;
         }
         Constraint::new_relation(parsed_tokens)
     }
@@ -94,7 +95,7 @@ pub fn parse_fact(tokens: Vec<String>) -> Result<Vec<DBValue>, String> {
     for tok in tokens {
         let parsed_tok = parse_token(&tok)?;
         match parsed_tok {
-            Value::Literal(dbval) => { parsed_tokens.push(dbval) },
+            Value::Literal(dbval) => { parsed_current_token = dbval },
             _ => {return Err("Cannot push variable relation as fact to database. Relations with variables can only be queries.".to_string())}
         }
     }
