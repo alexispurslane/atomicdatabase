@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::empty, pin::Pin, rc::Rc};
+use std::{collections::HashMap, iter::empty, pin::Pin, sync::Arc};
 
 use crate::database::backtracking::BacktrackingQuery;
 
@@ -73,20 +73,20 @@ impl Constraint {
 pub fn unify_wrap(
     av: &Vec<Value>,
     bv: &Vec<Value>,
-    bindings: Rc<Bindings>,
-) -> Option<Rc<Bindings>> {
+    bindings: Arc<Bindings>,
+) -> Option<Arc<Bindings>> {
     let inner = (*bindings).clone();
 
-    lax_unify(av, bv, inner).ok().map(|x| Rc::new(x))
+    lax_unify(av, bv, inner).ok().map(|x| Arc::new(x))
 }
 
 pub fn lax_unify_wrap(
     av: &Vec<Value>,
     bv: &Vec<Value>,
-    bindings: Rc<Bindings>,
-) -> Result<Rc<Bindings>, Rc<Bindings>> {
+    bindings: Arc<Bindings>,
+) -> Result<Arc<Bindings>, Arc<Bindings>> {
     let inner = (*bindings).clone();
-    lax_unify(av, bv, inner).map_or_else(|x| Err(Rc::new(x)), |x| Ok(Rc::new(x)))
+    lax_unify(av, bv, inner).map_or_else(|x| Err(Arc::new(x)), |x| Ok(Arc::new(x)))
 }
 
 pub fn lax_unify(
@@ -248,7 +248,7 @@ pub fn unify_pattern_match(
     partials
 }
 
-pub fn unify_compare(op: &EqOp, a: &Value, b: &Value, bindings: Rc<Bindings>) -> bool {
+pub fn unify_compare(op: &EqOp, a: &Value, b: &Value, bindings: Arc<Bindings>) -> bool {
     use Value::*;
     match (a, b) {
         (Literal(a), Literal(b)) => match op {
@@ -282,12 +282,12 @@ pub fn unify_compare(op: &EqOp, a: &Value, b: &Value, bindings: Rc<Bindings>) ->
     }
 }
 
-type BindingsIterator<'a> = Box<dyn Iterator<Item = Result<Rc<Bindings>, Rc<Bindings>>> + 'a>;
+type BindingsIterator<'a> = Box<dyn Iterator<Item = Result<Arc<Bindings>, Arc<Bindings>>> + 'a>;
 
 pub struct InnerFactPossibilitiesIter {
-    pub database: Rc<Database>,
+    pub database: Arc<Database>,
     pub id: RelationID,
-    pub bindings: Rc<Bindings>,
+    pub bindings: Arc<Bindings>,
     pub tokens: Vec<Value>,
     fact_index: usize,
 }
@@ -296,8 +296,8 @@ impl InnerFactPossibilitiesIter {
     pub fn new(
         id: RelationID,
         tokens: Vec<Value>,
-        database: Rc<Database>,
-        bindings: Rc<Bindings>,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
     ) -> Self {
         Self {
             id,
@@ -310,14 +310,13 @@ impl InnerFactPossibilitiesIter {
 }
 
 impl Iterator for InnerFactPossibilitiesIter {
-    type Item = Result<Rc<Bindings>, Rc<Bindings>>;
+    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(facts) = self.database.facts.get(&self.id) {
             if self.fact_index < facts.len() {
                 let fact = &facts[self.fact_index];
                 let fact_tokens = fact.iter().map(|x| Value::Literal(x.clone())).collect();
                 self.fact_index += 1;
-                println!("Found next possible binding for constraint given previous bindings");
                 Some(lax_unify_wrap(
                     &self.tokens,
                     &fact_tokens,
@@ -333,9 +332,9 @@ impl Iterator for InnerFactPossibilitiesIter {
 }
 
 pub struct InnerBacktrackingQueryIter<'a> {
-    pub database: Rc<Database>,
+    pub database: Arc<Database>,
     pub id: RelationID,
-    pub bindings: Rc<Bindings>,
+    pub bindings: Arc<Bindings>,
     pub tokens: Vec<Value>,
     inner_iterator: BindingsIterator<'a>,
     query_index: usize,
@@ -345,8 +344,8 @@ impl<'a> InnerBacktrackingQueryIter<'a> {
     pub fn new(
         id: RelationID,
         tokens: Vec<Value>,
-        database: Rc<Database>,
-        bindings: Rc<Bindings>,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
         constraints: &'a [Constraint],
         params: Vec<Value>,
     ) -> Self {
@@ -370,7 +369,7 @@ impl<'a> InnerBacktrackingQueryIter<'a> {
 }
 
 impl<'a> Iterator for InnerBacktrackingQueryIter<'a> {
-    type Item = Result<Rc<Bindings>, Rc<Bindings>>;
+    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner_iterator.next()
     }
@@ -378,15 +377,19 @@ impl<'a> Iterator for InnerBacktrackingQueryIter<'a> {
 
 pub struct PossibleBindings<'b> {
     pub constraint: &'b Constraint,
-    pub database: Rc<Database>,
-    pub bindings: Rc<Bindings>,
+    pub database: Arc<Database>,
+    pub bindings: Arc<Bindings>,
     current_fact_possibilities: BindingsIterator<'b>,
     current_rule_possibilities: BindingsIterator<'b>,
     done: bool,
 }
 
 impl<'b> PossibleBindings<'b> {
-    pub fn new(constraint: &'b Constraint, database: Rc<Database>, bindings: Rc<Bindings>) -> Self {
+    pub fn new(
+        constraint: &'b Constraint,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
+    ) -> Self {
         Self {
             constraint,
             database,
@@ -398,9 +401,9 @@ impl<'b> PossibleBindings<'b> {
     }
     pub fn new_with_bindings(
         constraint: &'b Constraint,
-        database: Rc<Database>,
-        bindings: Rc<Bindings>,
-        possibilities: Vec<Rc<Bindings>>,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
+        possibilities: Vec<Arc<Bindings>>,
     ) -> Self {
         Self {
             constraint,
@@ -414,7 +417,7 @@ impl<'b> PossibleBindings<'b> {
 }
 
 impl<'b> Iterator for PossibleBindings<'b> {
-    type Item = Result<Rc<Bindings>, Rc<Bindings>>;
+    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         use Constraint::*;

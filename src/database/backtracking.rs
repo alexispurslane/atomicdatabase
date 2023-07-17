@@ -1,21 +1,21 @@
 use std::borrow::Cow;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::unification::{chain_hashmap, Bindings, Constraint, PossibleBindings};
 use super::Database;
 
 pub struct BacktrackingQuery<'a> {
     pub constraints: &'a [Constraint],
-    pub database: Rc<Database>,
-    pub bindings: Rc<Bindings>,
+    pub database: Arc<Database>,
+    pub bindings: Arc<Bindings>,
     constraint_stack: Vec<(&'a Constraint, PossibleBindings<'a>)>,
 }
 
 impl<'a> BacktrackingQuery<'a> {
     pub fn new(
         constraints: &'a [Constraint],
-        database: Rc<Database>,
-        bindings: Rc<Bindings>,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
     ) -> Self {
         BacktrackingQuery {
             constraints,
@@ -27,9 +27,9 @@ impl<'a> BacktrackingQuery<'a> {
 }
 
 impl Iterator for BacktrackingQuery<'_> {
-    type Item = Rc<Bindings>;
+    type Item = Arc<Bindings>;
 
-    fn next(&mut self) -> Option<Rc<Bindings>> {
+    fn next(&mut self) -> Option<Arc<Bindings>> {
         loop {
             // Satisfy all the constraints
             if let Some(new_constraint) = self.constraints.get(self.constraint_stack.len()) {
@@ -46,7 +46,6 @@ impl Iterator for BacktrackingQuery<'_> {
                 if let Some(possible_binding) = last_possible_bindings.next() {
                     if let Ok(possible_binding) = possible_binding {
                         // possible bindings for this next branch given the next possible binding for the previous branch
-                        println!("New assumption for constraint given previous");
                         let new_possible_bindings = PossibleBindings::new(
                             new_constraint,
                             self.database.clone(),

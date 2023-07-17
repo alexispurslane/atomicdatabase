@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use database::{
     backtracking::BacktrackingQuery,
@@ -12,7 +12,7 @@ mod database;
 
 macro_rules! fact {
     ($db: ident, $($t:tt)*) => {
-        Rc::<Database>::get_mut(&mut $db).unwrap().insert_fact(parse_fact(tokenize(stringify!($($t)*).to_string())).unwrap())
+        $db.insert_fact(parse_fact(tokenize(stringify!($($t)*).to_string())).unwrap())
     };
 }
 
@@ -23,7 +23,7 @@ macro_rules! query_relation {
 }
 
 fn main() {
-    let mut db = Rc::new(Database::new());
+    let mut db = Arc::new(Database::new());
     fact!(db, "James" parent of "John");
     fact!(db, "James" parent of "Jesse");
     fact!(db, "James" parent of "Lucifer");
@@ -36,7 +36,7 @@ fn main() {
     fact!(db, "Joyce" parent of "Gottard");
     fact!(db, "Joyce" parent of "Mew");
 
-    Rc::<Database>::get_mut(&mut db).unwrap().insert_rule(
+    Arc::<Database>::get_mut(&mut db).unwrap().insert_rule(
         "grandparent".to_string(),
         vec![
             Value::Variable("X".to_string()),
@@ -49,10 +49,10 @@ fn main() {
         ],
     );
 
-    let bindings = Rc::new(HashMap::new());
+    let bindings = Arc::new(HashMap::new());
     let constraints = [
+        query_relation!(B parent of "Zack"),
         query_relation!(A parent of B),
-        query_relation!(B parent of C),
     ];
     let query = BacktrackingQuery::new(&constraints, db, bindings.clone());
     for solution in query {

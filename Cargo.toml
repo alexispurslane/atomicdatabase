@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 num-bigint = "0.4"
 lazy-regex = "3.0.0"
+dashmap = "5.5.0"
 
 [dependencies.uuid]
 version = "1.4.0"

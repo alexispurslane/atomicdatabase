@@ -2,9 +2,10 @@ pub mod backtracking;
 pub mod evaluator;
 pub mod unification;
 
+use dashmap::DashMap;
 use uuid;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::RwLock};
 
 use num_bigint::{BigInt, BigUint, ToBigUint};
 
@@ -71,29 +72,32 @@ impl PartialOrd for DBValue {
 }
 
 pub struct Database {
-    facts: HashMap<RelationID, Vec<Vec<DBValue>>>,
-    rules: HashMap<RelationID, (Vec<Value>, Vec<Constraint>)>,
+    facts: DashMap<RelationID, Vec<Vec<DBValue>>>,
+    rules: RwLock<HashMap<RelationID, (Vec<Value>, Vec<Constraint>)>>,
 }
 
 impl Database {
     pub fn new() -> Self {
         Database {
-            facts: HashMap::new(),
-            rules: HashMap::new(),
+            facts: DashMap::new(),
+            rules: RwLock::new(HashMap::new()),
         }
     }
 
     pub fn insert_rule(&mut self, id: RelationID, args: Vec<Value>, constraints: Vec<Constraint>) {
-        self.rules.insert(id.to_uppercase(), (args, constraints));
+        self.rules
+            .write()
+            .unwrap()
+            .insert(id.to_uppercase(), (args, constraints));
     }
 
-    pub fn insert_fact(&mut self, vs: Vec<DBValue>) {
+    pub fn insert_fact(&self, vs: Vec<DBValue>) {
         match vs.get(1) {
             Some(DBValue::RelationID(rel)) => {
                 let rel = rel.to_uppercase();
                 let mut vs = vs.clone();
                 vs.remove(1);
-                if let Some(rels) = self.facts.get_mut(&rel) {
+                if let Some(mut rels) = self.facts.get_mut(&rel) {
                     rels.push(vs);
                 } else {
                     self.facts.insert(rel, vec![vs]);
