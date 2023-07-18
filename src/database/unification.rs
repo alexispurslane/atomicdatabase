@@ -507,7 +507,13 @@ impl<'b> Iterator for PossibleBindings<'b> {
                 }
             }
             self.done = true;
-            self.current_fact_possibilities.next()
+            if let Some(binding) = self.current_fact_possibilities.next() {
+                Some(binding)
+            } else if let Some(binding) = self.current_rule_possibilities.next() {
+                Some(binding)
+            } else {
+                None
+            }
         } else {
             None
         }

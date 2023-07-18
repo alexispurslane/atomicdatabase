@@ -108,7 +108,7 @@ pub fn char_starts_token(i: usize, c: char, sign: Sign) -> Result<Token, String>
     if c.is_alphabetic() && c.is_uppercase() {
         Ok(Token::Variable(c.to_string()))
     } else if c.is_alphabetic() && c.is_lowercase() {
-        Ok(Token::RelationID(c.to_string()))
+        Ok(Token::RelationID(c.to_uppercase().to_string()))
     } else if c == '\"' || c == '\'' {
         Ok(Token::Text(String::new()))
     } else if c.is_numeric() {
@@ -188,7 +188,7 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
             }
             Some(Token::RelationID(ref mut s)) => {
                 if c.is_alphanumeric() {
-                    s.push(c);
+                    s.push(c.to_uppercase().collect::<Vec<char>>()[0]);
                     false
                 } else {
                     true
@@ -220,7 +220,6 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
             }
             Some(Token::Float(ref mut a, ref mut b)) => {
                 if c.is_numeric() {
-                    println!("{:?}", c);
                     if in_decimal {
                         let mut prevdigits = b.to_radix_be(10);
                         prevdigits.push(c.to_digit(10).unwrap() as u8);
@@ -378,7 +377,6 @@ pub fn tokens_to_ast(tokens: Vec<Token>) -> Result<Constraint, String> {
 
 pub fn parse_line(line: String) -> Result<Constraint, String> {
     let tokens = tokenize_line(line)?;
-    println!("{:?}", tokens);
     tokens_to_ast(tokens)
 }
 
@@ -396,13 +394,13 @@ pub fn parse_query(lines: &str) -> Result<Vec<Constraint>, String> {
     if errors.len() > 0 {
         Err(errors)
     } else {
+        println!("{:?}", constraints);
         Ok(constraints)
     }
 }
 
 pub fn parse_fact(line: String) -> Result<Vec<DBValue>, String> {
     let tokens = tokenize_line(line)?;
-    println!("{:?}", tokens);
     let mut dbvalues = vec![];
     for tok in tokens {
         dbvalues.push(match tok {

@@ -75,8 +75,8 @@ impl PartialOrd for DBValue {
 }
 
 pub struct Database {
-    facts: DashMap<RelationID, Vec<Vec<DBValue>>>,
-    rules: RwLock<HashMap<RelationID, (Vec<ASTValue>, Vec<Arc<Constraint>>)>>,
+    pub facts: DashMap<RelationID, Vec<Vec<DBValue>>>,
+    pub rules: RwLock<HashMap<RelationID, (Vec<ASTValue>, Vec<Arc<Constraint>>)>>,
 }
 
 impl Database {

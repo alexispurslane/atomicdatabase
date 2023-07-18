@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use database::{backtracking::BacktrackingQuery, parser::parse_fact, Database};
 
 use crate::database::{
-    parser::parse_query,
+    parser::{parse_query, tokenize_line, tokens_to_values},
     unification::{ASTValue, Constraint},
     DBValue,
 };
@@ -22,9 +22,19 @@ macro_rules! query {
     }
 }
 
+macro_rules! rule {
+    ($db:ident, $name:ident ( $($a:ident)+ ) => $($t:tt)+) => {
+        Arc::<Database>::get_mut(&mut $db).unwrap().insert_rule(
+            stringify!($name).to_string().to_uppercase(),
+            tokens_to_values(&tokenize_line(stringify!($($a)+).to_string()).unwrap()).unwrap(),
+            query!($($t)+),
+        );
+    }
+}
+
 fn main() {
     let mut db = Arc::new(Database::new());
-    fact!(db, "Rudolf I" father of "Frederik III");
+    fact!(db, "Rudolf I" father of "Frederick III");
     fact!(db, "Frederick III" father of "Maximiliaan I");
     fact!(db, "Jan II" mother of "Filips de Stoute");
     fact!(db, "Jan II" mother of "Karel V1");
@@ -49,21 +59,20 @@ fn main() {
     fact!(db, "Filips I de Schone" father of "Maria v Hongarije");
     fact!(db, "Johanna de Waanzinnige" mother of "Maria v Hongarije");
 
-    Arc::<Database>::get_mut(&mut db).unwrap().insert_rule(
-        "partner".to_string(),
-        vec![
-            ASTValue::Variable("X".to_string()),
-            ASTValue::Literal(DBValue::RelationID("OF".to_string())),
-            ASTValue::Variable("Y".to_string()),
-        ],
-        query!(X parent of T; Y parent of T),
+    println!("{:?}", db.facts);
+
+    rule!(db, partners (X with Y) =>
+          X father of T;
+          Y mother of T
     );
 
     let bindings = Arc::new(HashMap::new());
-    let constraints: Vec<Arc<Constraint>> = query!(A father of B [1, 2, 3];
-                             B father of C);
+    let constraints: Vec<Arc<Constraint>> = query!(A partners with B);
     let query = BacktrackingQuery::new(constraints.into(), db, bindings.clone());
-    for solution in query {
-        println!("SOLUTION FOUND: {:?}", solution);
+    for (i, solution) in query.enumerate() {
+        println!("Solution {}: ", i);
+        for (k, v) in solution.iter() {
+            println!("    {} === {:?}", k, v);
+        }
     }
 }
