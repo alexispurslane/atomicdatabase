@@ -1,7 +1,7 @@
-use num_bigint::{BigInt, BigUint, Sign};
+use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
 
 use super::{
-    unification::{Constraint, GlobPosition, Value},
+    unification::{ASTValue, Constraint, GlobPosition},
     DBValue,
 };
 
@@ -16,7 +16,7 @@ pub enum Token {
     List(Vec<DBValue>),
     Variable(VariableName),
     PatternMatch {
-        explicit_values: Vec<Value>,
+        explicit_values: Vec<ASTValue>,
         is_glob: bool,
         glob_position: GlobPosition,
     },
@@ -34,20 +34,36 @@ pub enum Token {
     EOL,
 }
 
-impl Token {
-    pub fn is_literal(&self) -> bool {
+pub trait ToASTValue {
+    fn to_value(self) -> Result<ASTValue, Token>;
+}
+
+impl ToASTValue for Token {
+    fn to_value(self) -> Result<ASTValue, Token> {
         use Token::*;
-        match self {
-            Text(_) => true,
-            Number(_) => true,
-            Float(_, _) => true,
-            RelationID(_) => true,
-            List(_) => true,
-            _ => false,
+        match self.to_dbvalue() {
+            Ok(dbval) => Ok(ASTValue::Literal(dbval)),
+            Err(Variable(var)) => Ok(ASTValue::Variable(var)),
+            Err(PatternMatch {
+                explicit_values,
+                is_glob,
+                glob_position,
+            }) => Ok(ASTValue::PatternMatch {
+                explicit_values,
+                is_glob,
+                glob_position,
+            }),
+            Err(tok) => Err(tok),
         }
     }
+}
 
-    pub fn to_dbvalue(self) -> Result<DBValue, Token> {
+pub trait ToDBValue {
+    fn to_dbvalue(self) -> Result<DBValue, Token>;
+}
+
+impl ToDBValue for Token {
+    fn to_dbvalue(self) -> Result<DBValue, Token> {
         use Token::*;
         match self {
             Text(a) => Ok(DBValue::Text(a)),
@@ -57,6 +73,34 @@ impl Token {
             List(a) => Ok(DBValue::List(a)),
             _ => Err(self),
         }
+    }
+}
+
+impl ToDBValue for String {
+    fn to_dbvalue(self) -> Result<DBValue, Token> {
+        Ok(DBValue::Text(self))
+    }
+}
+
+impl ToDBValue for isize {
+    fn to_dbvalue(self) -> Result<DBValue, Token> {
+        let bigint = self.to_bigint().ok_or(Token::NOP)?;
+        Ok(DBValue::Number(bigint))
+    }
+}
+
+impl ToDBValue for usize {
+    fn to_dbvalue(self) -> Result<DBValue, Token> {
+        let bigint = self.to_bigint().ok_or(Token::NOP)?;
+        Ok(DBValue::Number(bigint))
+    }
+}
+
+impl ToDBValue for f64 {
+    fn to_dbvalue(self) -> Result<DBValue, Token> {
+        let tokens = tokenize_line(format!("{}", self)).ok().ok_or(Token::NOP)?;
+        let float = tokens.get(0).ok_or(Token::NOP)?;
+        (float.clone()).to_dbvalue()
     }
 }
 
@@ -111,7 +155,6 @@ pub fn char_starts_token(i: usize, c: char, sign: Sign) -> Result<Token, String>
 pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
     let mut tokens = vec![];
     let mut current_token = None;
-    let mut digits: Vec<u64> = vec![];
     let mut sign = Sign::Plus;
     let mut in_decimal = false;
 
@@ -193,11 +236,7 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                 }
             }
 
-            Some(Token::PatternMatch {
-                explicit_values,
-                is_glob,
-                glob_position,
-            }) => {
+            Some(Token::PatternMatch { .. }) => {
                 return Err(format!(
                     "Met character `{}` in unimplemented token PatternMatch",
                     c
@@ -262,14 +301,103 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
         .collect())
 }
 
-pub fn tokens_to_constraints(tokens: Vec<Token>) -> Result<Constraint, String> {
-    Ok(Constraint::Relation("".to_string(), vec![]))
+pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
+    tokens
+        .iter()
+        .map(|x| x.clone().to_value())
+        .try_fold(vec![], |acc, x| {
+            if let Ok(x) = x {
+                Ok([acc, vec![x]].concat())
+            } else {
+                Err(format!("Unexpected value: `{:?}`", x))
+            }
+        })
+}
+
+pub fn tokens_to_ast(tokens: Vec<Token>) -> Result<Constraint, String> {
+    if let Some((left, right)) = tokens
+        .iter()
+        .position(|x| match x {
+            Token::UnifyOp => true,
+            Token::NotOp => true,
+            Token::AltOp => true,
+            Token::IntOp => true,
+            _ => false,
+        })
+        .map(|i| tokens.split_at(i))
+    {
+        let (left_expr, op, right_expr) = (&left, &right[0], &right[1..]);
+
+        match op {
+            Token::UnifyOp => {
+                let (left, right) = (tokens_to_values(left_expr)?, tokens_to_values(right_expr)?);
+                Ok(Constraint::Unification(left, right))
+            }
+            Token::NotOp => {
+                if left_expr.len() > 0 {
+                    Err(
+                        "Cannot have a negation not at the beginning of an expression! "
+                            .to_string(),
+                    )
+                } else if right_expr.len() == 0 {
+                    Err("An expression must follow a not operator. ".to_string())
+                } else {
+                    let ast = tokens_to_ast(right_expr.to_vec())?;
+                    Ok(Constraint::Not(Box::new(ast)))
+                }
+            }
+            Token::AltOp => {
+                let (left, right) = (
+                    tokens_to_ast(left_expr.to_vec())?,
+                    tokens_to_ast(right_expr.to_vec())?,
+                );
+                Ok(Constraint::Alternatives(Box::new(left), Box::new(right)))
+            }
+            Token::IntOp => {
+                let (left, right) = (
+                    tokens_to_ast(left_expr.to_vec())?,
+                    tokens_to_ast(right_expr.to_vec())?,
+                );
+                Ok(Constraint::Intersections(Box::new(left), Box::new(right)))
+            }
+            _ => panic!("How could this happen? We're smarter than this!"),
+        }
+    } else {
+        match tokens.get(1) {
+            Some(Token::RelationID(r)) => Ok(Constraint::Relation(
+                r.to_string(),
+                tokens_to_values(&[&tokens[0..1], &tokens[2..]].concat())?,
+            )),
+            t => Err(format!(
+                "Expected relation name in second place of plain statement, got `{:?}`",
+                t
+            )),
+        }
+    }
 }
 
 pub fn parse_line(line: String) -> Result<Constraint, String> {
     let tokens = tokenize_line(line)?;
     println!("{:?}", tokens);
-    tokens_to_constraints(tokens)
+    tokens_to_ast(tokens)
+}
+
+pub fn parse_query(lines: &str) -> Result<Vec<Constraint>, String> {
+    let mut constraints = vec![];
+    let mut errors = String::new();
+    for (linenum, line) in lines.split(';').enumerate() {
+        match parse_line(line.to_string()) {
+            Ok(constraint) => constraints.push(constraint),
+            Err(error_message) => {
+                errors.push_str(&format!("Line {}: {}\n", linenum, error_message))
+            }
+        }
+    }
+    if errors.len() > 0 {
+        Err(errors)
+    } else {
+        Ok(constraints)
+    }
 }
 
 pub fn parse_fact(line: String) -> Result<Vec<DBValue>, String> {

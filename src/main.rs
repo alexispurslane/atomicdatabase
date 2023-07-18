@@ -1,8 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
-use database::{backtracking::BacktrackingQuery, parser::parse_fact, parser::parse_line, Database};
+use database::{backtracking::BacktrackingQuery, parser::parse_fact, Database};
 
-use crate::database::{unification::Value, DBValue};
+use crate::database::{
+    parser::parse_query,
+    unification::{ASTValue, Constraint},
+    DBValue,
+};
 
 mod database;
 
@@ -12,9 +16,9 @@ macro_rules! fact {
     };
 }
 
-macro_rules! query_relation {
+macro_rules! query {
     ($($t:tt)+) => {
-        parse_line(stringify!($($t)*).to_string()).unwrap()
+        parse_query(stringify!($($t)*)).unwrap().into_iter().map(|x| Arc::new(x)).collect()
     }
 }
 
@@ -45,35 +49,11 @@ fn main() {
     fact!(db, "Filips I de Schone" father of "Maria v Hongarije");
     fact!(db, "Johanna de Waanzinnige" mother of "Maria v Hongarije");
 
-    Arc::<Database>::get_mut(&mut db).unwrap().insert_rule(
-        "grandparent".to_string(),
-        vec![
-            Value::Variable("X".to_string()),
-            Value::Literal(DBValue::RelationID("OF".to_string())),
-            Value::Variable("Y".to_string()),
-        ],
-        vec![
-            query_relation!(X parent of T),
-            query_relation!(Y parent of T),
-        ],
-    );
-
     let bindings = Arc::new(HashMap::new());
-    let constraints = [
-        query_relation!(A father of B),
-        query_relation!(B father of C),
-    ];
-    let query = BacktrackingQuery::new(&constraints, db, bindings.clone());
+    let constraints: Vec<Arc<Constraint>> = query!(A father of B [1, 2, 3];
+                             B father of C);
+    let query = BacktrackingQuery::new(constraints.into(), db, bindings.clone());
     for solution in query {
         println!("SOLUTION FOUND: {:?}", solution);
     }
-
-    let _ = parse_line(
-        "
-X Foo B1 1B > < <= >= = ~ !
-[\"a\", \"b\", \"c\"] foo,bar 12339844398938493859535898
-         \"cockaDoodLE do!#[]\"baz, 4.5"
-            .to_string(),
-    )
-    .unwrap();
 }

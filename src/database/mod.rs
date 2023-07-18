@@ -5,11 +5,14 @@ pub mod unification;
 use dashmap::DashMap;
 use uuid;
 
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use num_bigint::{BigInt, BigUint, ToBigUint};
 
-use self::unification::{Constraint, RelationID, Value};
+use self::unification::{ASTValue, Constraint, RelationID};
 
 #[derive(Clone, Debug)]
 pub enum DBValue {
@@ -73,7 +76,7 @@ impl PartialOrd for DBValue {
 
 pub struct Database {
     facts: DashMap<RelationID, Vec<Vec<DBValue>>>,
-    rules: RwLock<HashMap<RelationID, (Vec<Value>, Vec<Constraint>)>>,
+    rules: RwLock<HashMap<RelationID, (Vec<ASTValue>, Vec<Arc<Constraint>>)>>,
 }
 
 impl Database {
@@ -84,11 +87,16 @@ impl Database {
         }
     }
 
-    pub fn insert_rule(&mut self, id: RelationID, args: Vec<Value>, constraints: Vec<Constraint>) {
-        self.rules
-            .write()
-            .unwrap()
-            .insert(id.to_uppercase(), (args, constraints));
+    pub fn insert_rule(
+        &mut self,
+        id: RelationID,
+        args: Vec<ASTValue>,
+        constraints: Vec<Constraint>,
+    ) {
+        self.rules.write().unwrap().insert(
+            id.to_uppercase(),
+            (args, constraints.into_iter().map(|x| Arc::new(x)).collect()),
+        );
     }
 
     pub fn insert_fact(&self, vs: Vec<DBValue>) {

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, iter::empty, pin::Pin, sync::Arc};
+use std::{collections::HashMap, iter::empty, sync::Arc};
 
 use crate::database::backtracking::BacktrackingQuery;
 
@@ -12,11 +12,11 @@ pub enum GlobPosition {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Value {
+pub enum ASTValue {
     Literal(DBValue),
     Variable(VariableName),
     PatternMatch {
-        explicit_values: Vec<Value>,
+        explicit_values: Vec<ASTValue>,
         is_glob: bool,
         glob_position: GlobPosition,
     },
@@ -24,7 +24,7 @@ pub enum Value {
 
 pub type RelationID = String;
 
-pub type Bindings = HashMap<VariableName, Value>;
+pub type Bindings = HashMap<VariableName, ASTValue>;
 pub fn chain_hashmap<K: Clone + Eq + std::hash::Hash, V: Clone>(
     a: HashMap<K, V>,
     b: HashMap<K, V>,
@@ -43,18 +43,18 @@ pub enum EqOp {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Constraint {
-    Relation(RelationID, Vec<Value>),
-    Unification(Vec<Value>, Vec<Value>),
-    Comparison(EqOp, Value, Value),
+    Relation(RelationID, Vec<ASTValue>),
+    Unification(Vec<ASTValue>, Vec<ASTValue>),
+    Comparison(EqOp, ASTValue, ASTValue),
     Not(Box<Constraint>),
-    Alternatives(Vec<Constraint>),
-    Intersections(Vec<Constraint>),
+    Alternatives(Box<Constraint>, Box<Constraint>),
+    Intersections(Box<Constraint>, Box<Constraint>),
 }
 
 impl Constraint {
-    pub fn new_relation(vs: Vec<Value>) -> Result<Self, String> {
+    pub fn new_relation(vs: Vec<ASTValue>) -> Result<Self, String> {
         match vs.get(1) {
-            Some(Value::Literal(DBValue::RelationID(rel))) => {
+            Some(ASTValue::Literal(DBValue::RelationID(rel))) => {
                 let mut vs = vs.clone();
                 vs.remove(1);
                 Ok(Constraint::Relation(rel.to_uppercase(), vs))
@@ -71,8 +71,8 @@ impl Constraint {
 }
 
 pub fn unify_wrap(
-    av: &Vec<Value>,
-    bv: &Vec<Value>,
+    av: &Vec<ASTValue>,
+    bv: &Vec<ASTValue>,
     bindings: Arc<Bindings>,
 ) -> Option<Arc<Bindings>> {
     let inner = (*bindings).clone();
@@ -81,8 +81,8 @@ pub fn unify_wrap(
 }
 
 pub fn lax_unify_wrap(
-    av: &Vec<Value>,
-    bv: &Vec<Value>,
+    av: &Vec<ASTValue>,
+    bv: &Vec<ASTValue>,
     bindings: Arc<Bindings>,
 ) -> Result<Arc<Bindings>, Arc<Bindings>> {
     let inner = (*bindings).clone();
@@ -90,13 +90,13 @@ pub fn lax_unify_wrap(
 }
 
 pub fn lax_unify(
-    av: &Vec<Value>,
-    bv: &Vec<Value>,
+    av: &Vec<ASTValue>,
+    bv: &Vec<ASTValue>,
     bindings: Bindings,
 ) -> Result<Bindings, Bindings> {
     let mut new_bindings = bindings.clone();
     for (i, j) in av.into_iter().zip(bv) {
-        use Value::*;
+        use ASTValue::*;
         match (i, j) {
             (Literal(x), Literal(y)) => {
                 if x == y {
@@ -185,12 +185,12 @@ pub fn lax_unify(
 
 pub fn unify_pattern_match(
     list: &Vec<DBValue>,
-    explicit_values: &Vec<Value>,
+    explicit_values: &Vec<ASTValue>,
     is_glob: &bool,
     glob_position: &GlobPosition,
     new_bindings: Bindings,
 ) -> Result<Bindings, Bindings> {
-    use Value::*;
+    use ASTValue::*;
     let partials = if !is_glob {
         lax_unify(
             &explicit_values,
@@ -223,7 +223,7 @@ pub fn unify_pattern_match(
             ),
             GlobPosition::Middle => {
                 // Find the complete match, or largest incomplete match, at any position in the middle of the array
-                let list: Vec<Value> = list.clone().into_iter().map(|x| Literal(x)).collect();
+                let list: Vec<ASTValue> = list.clone().into_iter().map(|x| Literal(x)).collect();
                 let mut output = Err(HashMap::new());
                 for i in 0..list.len() {
                     let partials = lax_unify(
@@ -248,8 +248,8 @@ pub fn unify_pattern_match(
     partials
 }
 
-pub fn unify_compare(op: &EqOp, a: &Value, b: &Value, bindings: Arc<Bindings>) -> bool {
-    use Value::*;
+pub fn unify_compare(op: &EqOp, a: &ASTValue, b: &ASTValue, bindings: Arc<Bindings>) -> bool {
+    use ASTValue::*;
     match (a, b) {
         (Literal(a), Literal(b)) => match op {
             EqOp::GreaterThan => a > b,
@@ -288,14 +288,14 @@ pub struct InnerFactPossibilitiesIter {
     pub database: Arc<Database>,
     pub id: RelationID,
     pub bindings: Arc<Bindings>,
-    pub tokens: Vec<Value>,
+    pub tokens: Vec<ASTValue>,
     fact_index: usize,
 }
 
 impl InnerFactPossibilitiesIter {
     pub fn new(
         id: RelationID,
-        tokens: Vec<Value>,
+        tokens: Vec<ASTValue>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
     ) -> Self {
@@ -315,7 +315,7 @@ impl Iterator for InnerFactPossibilitiesIter {
         if let Some(facts) = self.database.facts.get(&self.id) {
             if self.fact_index < facts.len() {
                 let fact = &facts[self.fact_index];
-                let fact_tokens = fact.iter().map(|x| Value::Literal(x.clone())).collect();
+                let fact_tokens = fact.iter().map(|x| ASTValue::Literal(x.clone())).collect();
                 self.fact_index += 1;
                 Some(lax_unify_wrap(
                     &self.tokens,
@@ -335,7 +335,7 @@ pub struct InnerBacktrackingQueryIter<'a> {
     pub database: Arc<Database>,
     pub id: RelationID,
     pub bindings: Arc<Bindings>,
-    pub tokens: Vec<Value>,
+    pub tokens: Vec<ASTValue>,
     inner_iterator: BindingsIterator<'a>,
     query_index: usize,
 }
@@ -343,11 +343,11 @@ pub struct InnerBacktrackingQueryIter<'a> {
 impl<'a> InnerBacktrackingQueryIter<'a> {
     pub fn new(
         id: RelationID,
-        tokens: Vec<Value>,
+        tokens: Vec<ASTValue>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
-        constraints: &'a [Constraint],
-        params: Vec<Value>,
+        constraints: Vec<Arc<Constraint>>,
+        params: Vec<ASTValue>,
     ) -> Self {
         let mut res = Self {
             id,
@@ -376,7 +376,7 @@ impl<'a> Iterator for InnerBacktrackingQueryIter<'a> {
 }
 
 pub struct PossibleBindings<'b> {
-    pub constraint: &'b Constraint,
+    pub constraint: Arc<Constraint>,
     pub database: Arc<Database>,
     pub bindings: Arc<Bindings>,
     current_fact_possibilities: BindingsIterator<'b>,
@@ -386,7 +386,7 @@ pub struct PossibleBindings<'b> {
 
 impl<'b> PossibleBindings<'b> {
     pub fn new(
-        constraint: &'b Constraint,
+        constraint: Arc<Constraint>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
     ) -> Self {
@@ -400,7 +400,7 @@ impl<'b> PossibleBindings<'b> {
         }
     }
     pub fn new_with_bindings(
-        constraint: &'b Constraint,
+        constraint: Arc<Constraint>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
         possibilities: Vec<Arc<Bindings>>,
@@ -426,7 +426,7 @@ impl<'b> Iterator for PossibleBindings<'b> {
         } else if let Some(binding) = self.current_rule_possibilities.next() {
             Some(binding)
         } else if !self.done {
-            match self.constraint {
+            match self.constraint.as_ref() {
                 Relation(id, tokens) => {
                     self.current_fact_possibilities = Box::new(InnerFactPossibilitiesIter::new(
                         id.to_string(),
@@ -434,7 +434,8 @@ impl<'b> Iterator for PossibleBindings<'b> {
                         self.database.clone(),
                         self.bindings.clone(),
                     ));
-                    /*let val = self.database.rules.get(id);
+                    let db = self.database.rules.read().unwrap();
+                    let val = db.get(id);
                     if let Some((params, constraints)) = val {
                         self.current_rule_possibilities =
                             Box::new(InnerBacktrackingQueryIter::new(
@@ -442,10 +443,10 @@ impl<'b> Iterator for PossibleBindings<'b> {
                                 tokens.to_vec(),
                                 self.database.clone(),
                                 self.bindings.clone(),
-                                constraints,
+                                constraints.clone(),
                                 params.clone(),
                             ));
-                    }*/
+                    }
                 }
 
                 Comparison(op, a, b) => {
@@ -471,7 +472,7 @@ impl<'b> Iterator for PossibleBindings<'b> {
                     let shadow_database = self.database.clone();
                     self.current_fact_possibilities = Box::new(
                         PossibleBindings::new(
-                            constraint,
+                            (*constraint).clone().into(),
                             shadow_database.clone(),
                             shadow_binding.clone(),
                         )
@@ -479,22 +480,25 @@ impl<'b> Iterator for PossibleBindings<'b> {
                     );
                 }
 
-                Alternatives(constraints) => {
+                Alternatives(a, b) => {
                     let shadow_binding = self.bindings.clone();
                     let shadow_database = self.database.clone();
-                    let possibilities = constraints.iter().flat_map(move |constraint| {
-                        PossibleBindings::new(
-                            constraint,
-                            shadow_database.clone(),
-                            shadow_binding.clone(),
-                        )
-                    });
+                    let possibilities = PossibleBindings::new(
+                        (*a).clone().into(),
+                        shadow_database.clone(),
+                        shadow_binding.clone(),
+                    )
+                    .chain(PossibleBindings::new(
+                        (*b).clone().into(),
+                        shadow_database.clone(),
+                        shadow_binding.clone(),
+                    ));
                     self.current_fact_possibilities = Box::new(possibilities);
                 }
 
-                Intersections(constraints) => {
+                Intersections(a, b) => {
                     let possible_binds = BacktrackingQuery::new(
-                        constraints,
+                        vec![(*a).clone().into(), (*a).clone().into()],
                         self.database.clone(),
                         self.bindings.clone(),
                     )
