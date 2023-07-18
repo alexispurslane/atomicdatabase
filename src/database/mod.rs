@@ -91,12 +91,12 @@ impl Database {
         &mut self,
         id: RelationID,
         args: Vec<ASTValue>,
-        constraints: Vec<Constraint>,
+        constraints: Vec<Arc<Constraint>>,
     ) {
-        self.rules.write().unwrap().insert(
-            id.to_uppercase(),
-            (args, constraints.into_iter().map(|x| Arc::new(x)).collect()),
-        );
+        self.rules
+            .write()
+            .unwrap()
+            .insert(id.to_uppercase(), (args, constraints.clone()));
     }
 
     pub fn insert_fact(&self, vs: Vec<DBValue>) {

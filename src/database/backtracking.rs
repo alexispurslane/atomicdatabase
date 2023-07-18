@@ -4,6 +4,7 @@ use super::unification::{Bindings, Constraint, PossibleBindings};
 use super::Database;
 
 pub struct BacktrackingQuery<'a> {
+    // FIXME: Constraints should NOT require shared ownership, as far as I can tell
     pub constraints: Vec<Arc<Constraint>>,
     pub database: Arc<Database>,
     pub bindings: Arc<Bindings>,

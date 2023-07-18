@@ -49,6 +49,16 @@ fn main() {
     fact!(db, "Filips I de Schone" father of "Maria v Hongarije");
     fact!(db, "Johanna de Waanzinnige" mother of "Maria v Hongarije");
 
+    Arc::<Database>::get_mut(&mut db).unwrap().insert_rule(
+        "partner".to_string(),
+        vec![
+            ASTValue::Variable("X".to_string()),
+            ASTValue::Literal(DBValue::RelationID("OF".to_string())),
+            ASTValue::Variable("Y".to_string()),
+        ],
+        query!(X parent of T; Y parent of T),
+    );
+
     let bindings = Arc::new(HashMap::new());
     let constraints: Vec<Arc<Constraint>> = query!(A father of B [1, 2, 3];
                              B father of C);
