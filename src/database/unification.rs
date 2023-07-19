@@ -1,4 +1,9 @@
-use std::{collections::HashMap, iter::empty, sync::Arc};
+use core::fmt;
+use std::{
+    collections::HashMap,
+    iter::{empty, FlatMap},
+    sync::Arc,
+};
 
 use crate::database::backtracking::BacktrackingQuery;
 
@@ -21,6 +26,47 @@ pub enum ASTValue {
         glob_position: GlobPosition,
     },
 }
+impl fmt::Display for ASTValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ASTValue::Literal(val) => write!(f, "{}", val),
+            ASTValue::Variable(name) => write!(f, "{}", name),
+            ASTValue::PatternMatch {
+                explicit_values,
+                is_glob,
+                glob_position,
+            } => {
+                // if there's no glob, the glob is nowhere, so we tell each side
+                // that the glob is somewhere else!
+                let glob_position = if !*is_glob {
+                    &GlobPosition::Tail
+                } else {
+                    glob_position
+                };
+                match glob_position {
+                    GlobPosition::Head => write!(f, "{{ .. "),
+                    GlobPosition::Middle => write!(f, "{{ .. "),
+                    GlobPosition::Tail => write!(f, "{{ "),
+                }?;
+
+                for val in explicit_values {
+                    write!(f, "{} ", val)?;
+                }
+
+                let glob_position = if !*is_glob {
+                    &GlobPosition::Head
+                } else {
+                    glob_position
+                };
+                match glob_position {
+                    GlobPosition::Head => write!(f, "}}"),
+                    GlobPosition::Middle => write!(f, ".. }}"),
+                    GlobPosition::Tail => write!(f, ".. }}"),
+                }
+            }
+        }
+    }
+}
 
 pub type RelationID = String;
 
@@ -32,7 +78,7 @@ pub fn chain_hashmap<K: Clone + Eq + std::hash::Hash, V: Clone>(
     a.into_iter().chain(b).collect()
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum EqOp {
     GreaterThan,
     EqualTo,
@@ -41,30 +87,73 @@ pub enum EqOp {
     GreaterThanOrEqualTo,
 }
 
+impl fmt::Display for EqOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use EqOp::*;
+        match self {
+            GreaterThan => write!(f, ">"),
+            EqualTo => write!(f, "="),
+            LessThan => write!(f, "<"),
+            LessThanOrEqualTo => write!(f, "<="),
+            GreaterThanOrEqualTo => write!(f, ">="),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Constraint {
     Relation(RelationID, Vec<ASTValue>),
     Unification(Vec<ASTValue>, Vec<ASTValue>),
     Comparison(EqOp, ASTValue, ASTValue),
     Not(Box<Constraint>),
-    Alternatives(Box<Constraint>, Box<Constraint>),
-    Intersections(Box<Constraint>, Box<Constraint>),
+    Alternatives(Vec<Constraint>),
+    Intersections(Vec<Constraint>),
 }
 
-impl Constraint {
-    pub fn new_relation(vs: Vec<ASTValue>) -> Result<Self, String> {
-        match vs.get(1) {
-            Some(ASTValue::Literal(DBValue::RelationID(rel))) => {
-                let mut vs = vs.clone();
-                vs.remove(1);
-                Ok(Constraint::Relation(rel.to_uppercase(), vs))
+impl fmt::Display for Constraint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Constraint::*;
+        match self {
+            Relation(rel, values) => {
+                write!(f, " {} {}", rel, values[0])?;
+                for val in values.iter().skip(1) {
+                    write!(f, " {}", val)?;
+                }
+                fmt::Result::Ok(())
             }
-            Some(v) => Err(format!(
-                "Expected second term in relation to be a valid relation ID, not {:?}",
-                v
-            )),
-            None => {
-                Err("Not enough terms in relation to construct a meaningful relation. ".to_string())
+            Unification(av, bv) => {
+                for val in av.iter() {
+                    write!(f, "{} ", val)?;
+                }
+                write!(f, "~ ")?;
+                for val in bv.iter() {
+                    write!(f, "{} ", val)?;
+                }
+                fmt::Result::Ok(())
+            }
+            Comparison(op, a, b) => write!(f, "{} {} {}", a, op, b),
+            Not(constraint) => write!(f, "!{}", constraint),
+            Alternatives(av) => {
+                write!(f, "( ")?;
+                for (i, constraint) in av.iter().enumerate() {
+                    if i == av.len() - 1 {
+                        write!(f, "{}", constraint)?;
+                    } else {
+                        write!(f, "{};", constraint)?;
+                    }
+                }
+                write!(f, " )")
+            }
+            Intersections(av) => {
+                write!(f, "( ")?;
+                for (i, constraint) in av.iter().enumerate() {
+                    if i == av.len() - 1 {
+                        write!(f, "{}", constraint)?;
+                    } else {
+                        write!(f, "{},", constraint)?;
+                    }
+                }
+                write!(f, " )")
             }
         }
     }
@@ -331,50 +420,6 @@ impl Iterator for InnerFactPossibilitiesIter {
     }
 }
 
-pub struct InnerBacktrackingQueryIter<'a> {
-    pub database: Arc<Database>,
-    pub id: RelationID,
-    pub bindings: Arc<Bindings>,
-    pub tokens: Vec<ASTValue>,
-    inner_iterator: BindingsIterator<'a>,
-    query_index: usize,
-}
-
-impl<'a> InnerBacktrackingQueryIter<'a> {
-    pub fn new(
-        id: RelationID,
-        tokens: Vec<ASTValue>,
-        database: Arc<Database>,
-        bindings: Arc<Bindings>,
-        constraints: Vec<Arc<Constraint>>,
-        params: Vec<ASTValue>,
-    ) -> Self {
-        let mut res = Self {
-            id,
-            database: database.clone(),
-            bindings,
-            tokens,
-            inner_iterator: Box::new(empty()),
-            query_index: 0,
-        };
-        let db = database.clone();
-        res.inner_iterator =
-            if let Some(args) = unify_wrap(&res.tokens, &params, res.bindings.clone()) {
-                Box::new(BacktrackingQuery::new(constraints, db, args.clone()).map(|x| Ok(x)))
-            } else {
-                Box::new(empty())
-            };
-        res
-    }
-}
-
-impl<'a> Iterator for InnerBacktrackingQueryIter<'a> {
-    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner_iterator.next()
-    }
-}
-
 pub struct PossibleBindings<'b> {
     pub constraint: Arc<Constraint>,
     pub database: Arc<Database>,
@@ -437,15 +482,16 @@ impl<'b> Iterator for PossibleBindings<'b> {
                     let db = self.database.rules.read().unwrap();
                     let val = db.get(id);
                     if let Some((params, constraints)) = val {
-                        self.current_rule_possibilities =
-                            Box::new(InnerBacktrackingQueryIter::new(
-                                id.to_string(),
-                                tokens.to_vec(),
+                        println!("{:?}", constraints);
+                        if let Some(args) = unify_wrap(&tokens, &params, self.bindings.clone()) {
+                            let possible_binds = BacktrackingQuery::new(
+                                constraints.into_iter().map(|a| a.clone()).collect(),
                                 self.database.clone(),
-                                self.bindings.clone(),
-                                constraints.clone(),
-                                params.clone(),
-                            ));
+                                args.clone(),
+                            )
+                            .map(|x| Ok(x));
+                            self.current_rule_possibilities = Box::new(possible_binds);
+                        }
                     }
                 }
 
@@ -476,35 +522,33 @@ impl<'b> Iterator for PossibleBindings<'b> {
                             shadow_database.clone(),
                             shadow_binding.clone(),
                         )
-                        .map(|x| x.map_or_else(|x| Ok(x), |x| Err(x))),
+                        .map(|x| {
+                            println!("{:?}", x);
+                            x.map_or_else(|x| Ok(x), |x| Err(x))
+                        }),
                     );
                 }
 
-                Alternatives(a, b) => {
+                Alternatives(av) => {
                     let shadow_binding = self.bindings.clone();
                     let shadow_database = self.database.clone();
-                    let possibilities = PossibleBindings::new(
-                        (*a).clone().into(),
+                    let possibilities = construct_alternatives(
+                        av.clone(),
                         shadow_database.clone(),
                         shadow_binding.clone(),
-                    )
-                    .chain(PossibleBindings::new(
-                        (*b).clone().into(),
-                        shadow_database.clone(),
-                        shadow_binding.clone(),
-                    ));
+                    );
                     self.current_fact_possibilities = Box::new(possibilities);
                 }
-
-                Intersections(a, b) => {
+                Intersections(av) => {
                     let possible_binds = BacktrackingQuery::new(
-                        vec![(*a).clone().into(), (*a).clone().into()],
+                        av.into_iter().map(|a| Arc::new(a.clone())).collect(),
                         self.database.clone(),
                         self.bindings.clone(),
                     )
                     .map(|x| Ok(x));
-                    self.current_rule_possibilities = Box::new(possible_binds);
+                    self.current_fact_possibilities = Box::new(possible_binds);
                 }
+                _ => unimplemented!(),
             }
             self.done = true;
             if let Some(binding) = self.current_fact_possibilities.next() {
@@ -518,4 +562,13 @@ impl<'b> Iterator for PossibleBindings<'b> {
             None
         }
     }
+}
+
+fn construct_alternatives<'a>(
+    av: Vec<Constraint>,
+    database: Arc<Database>,
+    bindings: Arc<Bindings>,
+) -> impl Iterator<Item = Result<Arc<Bindings>, Arc<Bindings>>> {
+    av.into_iter()
+        .flat_map(move |a| PossibleBindings::new(Arc::new(a), database.clone(), bindings.clone()))
 }

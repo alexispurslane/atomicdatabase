@@ -1,0 +1,32 @@
+"Rudolf I" father of "Frederick III".
+"Frederick III" father of "Maximiliaan I".
+"Jan II" mother of "Filips de Stoute".
+"Jan II" mother of "Karel V1".
+"Karel V" father of "Frans I".
+"Filips de Stoute" father of "Jan zonder Vrees".
+"Jan zonder Vrees" mother of "Filips de Goede".
+"Filips de Goede" father of "Karel de Stoute".
+"Karel de Stoute" father of "Maria".
+"Maria" mother of "Filips I de Schone".
+"Maximiliaan I" father of "Filips I de Schone".
+"Johan II v Kastilie" father of "Hendrik IV".
+"Johan II v Kastilie" father of "Isabella I".
+"Johan II v Aragon" father of "Ferdinand V".
+"Ferdinand V" father of "Johanna de Waanzinnige".
+"Isabella I" mother of "Johanna de Waanzinnige".
+"Filips I de Schone" father of "Eleonora".
+"Johanna de Waanzinnige" mother of "Eleonora".
+"Filips I de Schone" father of "Karel V".
+"Johanna de Waanzinnige" mother of "Karel V".
+"Filips I de Schone" father of "Ferdinand I".
+"Johanna de Waanzinnige" mother of "Ferdinand I".
+"Filips I de Schone" father of "Maria v Hongarije".
+"Johanna de Waanzinnige" mother of "Maria v Hongarije".
+"Karel V" father of "Filips II".
+"Karel V" father of "Margaretha v Parma".
+
+X partners with Y:
+    X father of T,
+    Y mother of T.
+
+A partners with B.

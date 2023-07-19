@@ -3,16 +3,20 @@ pub mod parser;
 pub mod unification;
 
 use dashmap::DashMap;
-use uuid;
 
 use std::{
     collections::HashMap,
+    fmt,
     sync::{Arc, RwLock},
 };
 
 use num_bigint::{BigInt, BigUint, ToBigUint};
 
-use self::unification::{ASTValue, Constraint, RelationID};
+use self::{
+    backtracking::BacktrackingQuery,
+    parser::MetaAST,
+    unification::{ASTValue, Bindings, Constraint, RelationID},
+};
 
 #[derive(Clone, Debug)]
 pub enum DBValue {
@@ -21,6 +25,24 @@ pub enum DBValue {
     Float(BigInt, BigUint),
     RelationID(String),
     List(Vec<DBValue>),
+}
+
+impl fmt::Display for DBValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DBValue::Text(s) => write!(f, "\"{}\"", s),
+            DBValue::Number(n) => write!(f, "{}", n),
+            DBValue::Float(a, b) => write!(f, "{}.{}", a, b),
+            DBValue::RelationID(rel) => write!(f, "{}", rel),
+            DBValue::List(l) => {
+                write!(f, "[ ")?;
+                for val in l {
+                    write!(f, "{} ", val)?;
+                }
+                write!(f, "]")
+            }
+        }
+    }
 }
 
 impl PartialEq for DBValue {
@@ -88,18 +110,19 @@ impl Database {
     }
 
     pub fn insert_rule(
-        &mut self,
+        &self,
         id: RelationID,
         args: Vec<ASTValue>,
         constraints: Vec<Arc<Constraint>>,
-    ) {
+    ) -> Result<(), String> {
         self.rules
             .write()
-            .unwrap()
+            .map_err(|e| format!("Error writing rule {} to database: '{}'. ", id, e))?
             .insert(id.to_uppercase(), (args, constraints.clone()));
+        Ok(())
     }
 
-    pub fn insert_fact(&self, vs: Vec<DBValue>) {
+    pub fn insert_fact(&self, vs: Vec<DBValue>) -> Result<(), String> {
         match vs.get(1) {
             Some(DBValue::RelationID(rel)) => {
                 let rel = rel.to_uppercase();
@@ -110,13 +133,43 @@ impl Database {
                 } else {
                     self.facts.insert(rel, vec![vs]);
                 }
+                Ok(())
             }
-            Some(v) => panic!(
+            Some(v) => Err(format!(
                 "Expected second term in database relation to be a valid relation ID, not {:?}. ",
                 v
-            ),
-            None => {
-                panic!("Not enough terms in database relation to construct a meaningful relation. ")
+            )),
+            None => Err(format!(
+                "Not enough terms in database relation to construct a meaningful relation. "
+            )),
+        }
+    }
+
+    pub fn evaluate<'a>(
+        db: Arc<Database>,
+        bindings: Arc<Bindings>,
+        statement: MetaAST,
+    ) -> Result<Option<BacktrackingQuery<'a>>, String> {
+        match statement {
+            MetaAST::Constraint(c) => Ok(Some(BacktrackingQuery::new(
+                vec![Arc::new(c)],
+                db.clone(),
+                bindings.clone(),
+            ))),
+            MetaAST::Fact(fact) => db.insert_fact(fact).map(|_| None),
+            MetaAST::Rule(mut signature, body) => {
+                if let ASTValue::Literal(DBValue::RelationID(name)) = signature.remove(1) {
+                    db.insert_rule(
+                        name,
+                        signature,
+                        body.into_iter().map(|x| Arc::new(x)).collect(),
+                    )
+                    .map(|_| None)
+                } else {
+                    return Err(format!(
+                        "Need at least one relation-id keyword in rule signature. "
+                    ));
+                }
             }
         }
     }

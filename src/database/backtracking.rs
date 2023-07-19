@@ -1,3 +1,4 @@
+use std::backtrace::Backtrace;
 use std::sync::Arc;
 
 use super::unification::{Bindings, Constraint, PossibleBindings};
@@ -35,6 +36,7 @@ impl Iterator for BacktrackingQuery<'_> {
             let current_constraint_index = self.constraint_stack.len();
             // Satisfy all the constraints
             if let Some(new_constraint) = self.constraints.get(current_constraint_index) {
+                println!("{:?}", new_constraint);
                 let mut only_possible = PossibleBindings::new_with_bindings(
                     new_constraint.clone(),
                     self.database.clone(),

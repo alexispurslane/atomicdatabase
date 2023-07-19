@@ -1,7 +1,7 @@
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
 
 use super::{
-    unification::{ASTValue, Constraint, GlobPosition},
+    unification::{ASTValue, Constraint, EqOp, GlobPosition},
     DBValue,
 };
 
@@ -14,24 +14,24 @@ pub enum Token {
     Float(BigInt, BigUint),
     RelationID(String),
     List(Vec<DBValue>),
+    Group(Vec<Token>),
     Variable(VariableName),
     PatternMatch {
         explicit_values: Vec<ASTValue>,
         is_glob: bool,
         glob_position: GlobPosition,
     },
-    GreaterThan,
-    EqualTo,
-    LessThan,
-    LessThanOrEqualTo,
-    GreaterThanOrEqualTo,
+    RuleOp,
     UnifyOp,
+    EqOp(EqOp),
     NotOp,
     AltOp,
     IntOp,
     // lexing control ops (internal)
+    IntermediateList(String),
+    IntermediateGroup(String),
     NOP,
-    EOL,
+    StatementEnd,
 }
 
 pub trait ToASTValue {
@@ -104,81 +104,80 @@ impl ToDBValue for f64 {
     }
 }
 
-pub fn char_starts_token(i: usize, c: char, sign: Sign) -> Result<Token, String> {
-    if c.is_alphabetic() && c.is_uppercase() {
-        Ok(Token::Variable(c.to_string()))
-    } else if c.is_alphabetic() && c.is_lowercase() {
-        Ok(Token::RelationID(c.to_uppercase().to_string()))
-    } else if c == '\"' || c == '\'' {
-        Ok(Token::Text(String::new()))
-    } else if c.is_numeric() {
-        let n = BigInt::from_radix_be(sign, &vec![c.to_digit(10).unwrap() as u8], 10).unwrap();
-        Ok(Token::Number(n))
-    } else if c == '.' {
-        Ok(Token::Float(
-            BigInt::new(sign, vec![]),
-            BigUint::new(vec![]),
-        ))
-    } else if c == '[' {
-        Ok(Token::List(vec![]))
-    } else if c == ']' {
-        Ok(Token::EOL)
-    } else if c == '{' {
-        Ok(Token::PatternMatch {
+pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
+    match c {
+        '\"' | '\'' => Ok(Token::Text(String::new())),
+        '.' => Ok(Token::StatementEnd),
+        '[' => Ok(Token::IntermediateList(String::new())),
+        '(' => Ok(Token::IntermediateGroup(String::new())),
+        '{' => Ok(Token::PatternMatch {
             explicit_values: vec![],
             is_glob: false,
             glob_position: super::unification::GlobPosition::Middle,
-        })
-    } else if c == '~' {
-        Ok(Token::UnifyOp)
-    } else if c == '!' {
-        Ok(Token::NotOp)
-    } else if c == '|' {
-        Ok(Token::AltOp)
-    } else if c == '&' {
-        Ok(Token::IntOp)
-    } else if c == '<' {
-        Ok(Token::LessThan)
-    } else if c == '>' {
-        Ok(Token::GreaterThan)
-    } else if c == '=' {
-        Ok(Token::EqualTo)
-    } else if c.is_whitespace() {
-        Ok(Token::NOP)
-    } else if c == ',' {
-        Ok(Token::NOP)
-    } else {
-        Err(format!("Unknown char `{}` at column {}", c, i))
+        }),
+        '~' => Ok(Token::UnifyOp),
+        '!' => Ok(Token::NotOp),
+        ';' => Ok(Token::AltOp),
+        ',' => Ok(Token::IntOp),
+        ':' => Ok(Token::RuleOp),
+        '<' => Ok(Token::EqOp(EqOp::LessThan)),
+        '>' => Ok(Token::EqOp(EqOp::GreaterThan)),
+        '=' => Ok(Token::EqOp(EqOp::EqualTo)),
+        // for the next two: we need to start a number that has no digits, but
+        // obviously that's nonsensical, so we need to put some digit in there,
+        // but a digit we can distinguish from one that was put in there by a
+        // branch that starts the number with a digit instead of no digits, so
+        // we can know to remove it, since it's arbitrary garbage. To do this,
+        // we take advantage of the fact that BigInt/BigUint can have arbitrary
+        // radices, but this language only uses base ten, to put in a digit with
+        // an absurdly high value that you'd never get in a single digit of a
+        // base ten system, so we know that this is a control digit that can be
+        // discarded
+        '+' => Ok(Token::Number(
+            BigInt::from_radix_be(Sign::Plus, &vec![255], 256).unwrap(),
+        )),
+        '-' => Ok(Token::Number(
+            BigInt::from_radix_be(Sign::Minus, &vec![255], 256).unwrap(),
+        )),
+
+        c if c.is_whitespace() => Ok(Token::NOP),
+        c if c.is_alphabetic() && c.is_uppercase() => Ok(Token::Variable(c.to_string())),
+        c if c.is_alphabetic() && c.is_lowercase() => {
+            Ok(Token::RelationID(c.to_uppercase().to_string()))
+        }
+        c if c.is_numeric() => Ok(Token::Number(
+            BigInt::from_radix_be(Sign::Plus, &vec![c.to_digit(10).unwrap() as u8], 10).unwrap(),
+        )),
+
+        _ => Err(format!("Unknown char `{}` at column {}", c, i)),
     }
 }
 
 pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
     let mut tokens = vec![];
     let mut current_token = None;
-    let mut sign = Sign::Plus;
     let mut in_decimal = false;
+    let mut list_depth = 0;
+    let mut paren_depth = 0;
 
     for (i, c) in (line + " ").chars().enumerate() {
+        if c == '[' {
+            list_depth += 1;
+        }
+        if c == '(' {
+            paren_depth += 1;
+        }
         let token_end = match current_token {
             None => {
-                if c == '+' {
-                    sign = Sign::Plus;
-                } else if c == '-' {
-                    sign = Sign::Minus;
-                } else {
-                    if c == '.' {
-                        in_decimal = true;
-                    }
-                    current_token = Some(char_starts_token(i, c, sign)?);
+                if c == '.' {
+                    in_decimal = true;
                 }
+                current_token = Some(char_starts_token(i, c)?);
                 false
             }
             Some(Token::Text(ref mut s)) => {
                 if c == '"' {
-                    match tokens.last_mut() {
-                        Some(Token::List(ref mut l)) => l.push(DBValue::Text(s.clone())),
-                        _ => tokens.push(current_token.unwrap()),
-                    }
+                    tokens.push(current_token.unwrap());
                     current_token = None;
                     false
                 } else {
@@ -196,8 +195,20 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
             }
             Some(Token::Number(ref mut n)) => {
                 if c.is_numeric() {
-                    let (sign, mut prevdigits) = n.to_radix_be(10);
-                    prevdigits.push(c.to_digit(10).unwrap() as u8);
+                    let digit = c.to_digit(10).unwrap() as u8;
+                    // get sign and digits at test-radix, so we can see our test
+                    // value
+                    let (sign, mut prevdigits) = n.to_radix_be(256);
+                    // test value is here, we don't need the previous digits and
+                    // can start over with this digit
+                    if prevdigits[0] == 255 {
+                        prevdigits = vec![digit]
+                    } else {
+                        // otherwise, we really wanted digits in base 10, so ask
+                        // for that, then add our new digit
+                        prevdigits = n.to_radix_be(10).1;
+                        prevdigits.push(digit);
+                    }
                     *n = BigInt::from_radix_be(sign, &prevdigits, 10).unwrap();
                     false
                 } else if c == '.' {
@@ -208,13 +219,35 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                     true
                 }
             }
-            Some(Token::List(_)) => {
-                if c == ']' {
-                    tokens.push(Token::NOP);
+            Some(Token::IntermediateGroup(ref mut s)) => {
+                if c == ')' {
+                    paren_depth -= 1;
+                    if paren_depth == 0 {
+                        tokens.push(Token::Group(tokenize_line(s.to_string())?));
+                        current_token = None;
+                    } else {
+                        s.push(c);
+                    }
                     false
                 } else {
-                    tokens.push(current_token.unwrap());
-                    current_token = char_starts_token(i, c, sign).ok();
+                    s.push(c);
+                    false
+                }
+            }
+            Some(Token::IntermediateList(ref mut s)) => {
+                if c == ']' {
+                    list_depth -= 1;
+                    if list_depth == 0 {
+                        tokens.push(Token::List(tokens_to_dbvalues(tokenize_line(
+                            s.to_string(),
+                        )?)?));
+                        current_token = None;
+                    } else {
+                        s.push(c);
+                    }
+                    false
+                } else {
+                    s.push(c);
                     false
                 }
             }
@@ -249,55 +282,34 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                     true
                 }
             }
-            Some(Token::LessThan) => {
+            Some(Token::EqOp(EqOp::LessThan)) => {
                 if c == '=' {
-                    current_token = Some(Token::LessThanOrEqualTo);
+                    current_token = Some(Token::EqOp(EqOp::LessThanOrEqualTo));
                     false
                 } else {
                     true
                 }
             }
-            Some(Token::GreaterThan) => {
+            Some(Token::EqOp(EqOp::GreaterThan)) => {
                 if c == '=' {
-                    current_token = Some(Token::GreaterThanOrEqualTo);
+                    current_token = Some(Token::EqOp(EqOp::GreaterThanOrEqualTo));
                     false
                 } else {
                     true
                 }
             }
             Some(Token::NOP) => {
-                current_token = char_starts_token(i, c, sign).ok();
-                false
-            }
-            Some(Token::EOL) => {
-                tokens.push(Token::EOL);
-                current_token = char_starts_token(i, c, sign).ok();
+                current_token = char_starts_token(i, c).ok();
                 false
             }
             _ => true,
         };
         if token_end {
-            match tokens.last_mut() {
-                Some(Token::List(ref mut l)) => match current_token.map(|x| x.to_dbvalue()) {
-                    None => panic!("Should be unreachable"),
-                    Some(Err(tok)) => {
-                        return Err(format!(
-                            "Unexpected operator `{:?}` in list at col {}.",
-                            tok, i
-                        ))
-                    }
-                    Some(Ok(dbval)) => l.push(dbval),
-                },
-                _ => tokens.push(current_token.unwrap()),
-            }
-
-            current_token = char_starts_token(i, c, sign).ok();
+            tokens.push(current_token.unwrap());
+            current_token = char_starts_token(i, c).ok();
         }
     }
-    Ok(tokens
-        .into_iter()
-        .filter(|x| *x != Token::NOP && *x != Token::EOL)
-        .collect())
+    Ok(tokens.into_iter().filter(|x| *x != Token::NOP).collect())
 }
 
 pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
@@ -313,21 +325,88 @@ pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
         })
 }
 
-pub fn tokens_to_ast(tokens: Vec<Token>) -> Result<Constraint, String> {
-    if let Some((left, right)) = tokens
-        .iter()
-        .position(|x| match x {
-            Token::UnifyOp => true,
-            Token::NotOp => true,
-            Token::AltOp => true,
-            Token::IntOp => true,
-            _ => false,
-        })
-        .map(|i| tokens.split_at(i))
+pub fn tokens_to_dbvalues(tokens: Vec<Token>) -> Result<Vec<DBValue>, String> {
+    let mut dbvalues = vec![];
+    for tok in tokens {
+        dbvalues.push(match tok {
+            Token::Text(a) => DBValue::Text(a),
+            Token::Number(a) => DBValue::Number(a),
+            Token::Float(a, b) => DBValue::Float(a, b),
+            Token::RelationID(a) => DBValue::RelationID(a),
+            Token::List(a) => DBValue::List(a),
+            t => return Err(format!("Invalid token {:?} in fact", t)),
+        });
+    }
+    Ok(dbvalues)
+}
+
+macro_rules! precidence_table {
+    ($tokens: ident, $( $p:pat ),+) => {
+        vec![$( $tokens.iter().position(|x| match x {
+            $p => true,
+            _ => false
+        }) ),+].iter().fold(None, |x, y| x.or(*y))
+    };
+}
+
+pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
+    // split at lowest precidence operators first
+
+    if let Some((left, right)) = precidence_table!(
+        tokens,
+        Token::AltOp,
+        Token::IntOp,
+        Token::UnifyOp,
+        Token::NotOp,
+        Token::EqOp(_)
+    )
+    .map(|i| tokens.split_at(i))
     {
         let (left_expr, op, right_expr) = (&left, &right[0], &right[1..]);
 
         match op {
+            Token::AltOp => {
+                let (left, right) = (
+                    tokens_to_constraint(left_expr.to_vec())?,
+                    tokens_to_constraint(right_expr.to_vec())?,
+                );
+                let (left_vec, right_vec) = (
+                    if let Constraint::Alternatives(av) = left {
+                        av
+                    } else {
+                        vec![left]
+                    },
+                    if let Constraint::Alternatives(av) = right {
+                        av
+                    } else {
+                        vec![right]
+                    },
+                );
+                Ok(Constraint::Alternatives(
+                    vec![left_vec, right_vec].into_iter().flatten().collect(),
+                ))
+            }
+            Token::IntOp => {
+                let (left, right) = (
+                    tokens_to_constraint(left_expr.to_vec())?,
+                    tokens_to_constraint(right_expr.to_vec())?,
+                );
+                let (left_vec, right_vec) = (
+                    if let Constraint::Intersections(av) = left {
+                        av
+                    } else {
+                        vec![left]
+                    },
+                    if let Constraint::Intersections(av) = right {
+                        av
+                    } else {
+                        vec![right]
+                    },
+                );
+                Ok(Constraint::Intersections(
+                    vec![left_vec, right_vec].into_iter().flatten().collect(),
+                ))
+            }
             Token::UnifyOp => {
                 let (left, right) = (tokens_to_values(left_expr)?, tokens_to_values(right_expr)?);
                 Ok(Constraint::Unification(left, right))
@@ -341,76 +420,130 @@ pub fn tokens_to_ast(tokens: Vec<Token>) -> Result<Constraint, String> {
                 } else if right_expr.len() == 0 {
                     Err("An expression must follow a not operator. ".to_string())
                 } else {
-                    let ast = tokens_to_ast(right_expr.to_vec())?;
+                    let ast = tokens_to_constraint(right_expr.to_vec())?;
                     Ok(Constraint::Not(Box::new(ast)))
                 }
             }
-            Token::AltOp => {
-                let (left, right) = (
-                    tokens_to_ast(left_expr.to_vec())?,
-                    tokens_to_ast(right_expr.to_vec())?,
-                );
-                Ok(Constraint::Alternatives(Box::new(left), Box::new(right)))
-            }
-            Token::IntOp => {
-                let (left, right) = (
-                    tokens_to_ast(left_expr.to_vec())?,
-                    tokens_to_ast(right_expr.to_vec())?,
-                );
-                Ok(Constraint::Intersections(Box::new(left), Box::new(right)))
+            Token::EqOp(op) => {
+                let (mut left, mut right) =
+                    (tokens_to_values(left_expr)?, tokens_to_values(right_expr)?);
+                if left.len() != 1 || right.len() != 1 {
+                    Err("Cannot have more than one value on either end of a comparison".to_string())
+                } else {
+                    Ok(Constraint::Comparison(
+                        op.clone(),
+                        left.remove(0),
+                        right.remove(0),
+                    ))
+                }
             }
             _ => panic!("How could this happen? We're smarter than this!"),
         }
     } else {
-        match tokens.get(1) {
-            Some(Token::RelationID(r)) => Ok(Constraint::Relation(
+        if let Some(Token::RelationID(r)) = tokens.get(1) {
+            Ok(Constraint::Relation(
                 r.to_string(),
                 tokens_to_values(&[&tokens[0..1], &tokens[2..]].concat())?,
-            )),
-            t => Err(format!(
-                "Expected relation name in second place of plain statement, got `{:?}`",
-                t
-            )),
+            ))
+        } else if let Some(Token::Group(group)) = tokens.get(0) {
+            println!("{:?}", tokens);
+            if tokens.len() == 1 {
+                tokens_to_constraint(group.to_vec())
+            } else {
+                Err(format!("Cannot put two group expressions next to each other without some kind of operator determining how they'll be evaluated together"))
+            }
+        } else {
+            Err(format!(
+                "Expected valid expression (relation or group), got {:?}",
+                tokens
+            ))
         }
     }
 }
 
 pub fn parse_line(line: String) -> Result<Constraint, String> {
     let tokens = tokenize_line(line)?;
-    tokens_to_ast(tokens)
-}
-
-pub fn parse_query(lines: &str) -> Result<Vec<Constraint>, String> {
-    let mut constraints = vec![];
-    let mut errors = String::new();
-    for (linenum, line) in lines.split(';').enumerate() {
-        match parse_line(line.to_string()) {
-            Ok(constraint) => constraints.push(constraint),
-            Err(error_message) => {
-                errors.push_str(&format!("Line {}: {}\n", linenum, error_message))
-            }
-        }
-    }
-    if errors.len() > 0 {
-        Err(errors)
-    } else {
-        println!("{:?}", constraints);
-        Ok(constraints)
-    }
+    tokens_to_constraint(tokens)
 }
 
 pub fn parse_fact(line: String) -> Result<Vec<DBValue>, String> {
     let tokens = tokenize_line(line)?;
-    let mut dbvalues = vec![];
+    tokens_to_dbvalues(tokens)
+}
+
+pub enum MetaAST {
+    Constraint(Constraint),
+    Rule(Vec<ASTValue>, Vec<Constraint>),
+    Fact(Vec<DBValue>),
+}
+
+pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
+    let mut statements = vec![];
+    let mut statement = vec![];
+    let tokens = tokenize_line(lines.to_string())?;
     for tok in tokens {
-        dbvalues.push(match tok {
-            Token::Text(a) => DBValue::Text(a),
-            Token::Number(a) => DBValue::Number(a),
-            Token::Float(a, b) => DBValue::Float(a, b),
-            Token::RelationID(a) => DBValue::RelationID(a),
-            Token::List(a) => DBValue::List(a),
-            t => return Err(format!("Invalid token {:?} in fact", t)),
-        });
+        if tok == Token::StatementEnd {
+            if statement.len() > 0 {
+                statements.push(statement);
+                statement = vec![];
+            }
+        } else {
+            statement.push(tok);
+        }
     }
-    Ok(dbvalues)
+
+    let mut constraints = vec![];
+    for (linenum, tokens) in statements.into_iter().enumerate() {
+        if let Ok(fact) = tokens_to_dbvalues(tokens.clone()) {
+            constraints.push(MetaAST::Fact(fact));
+        } else {
+            if let Some((left, right)) = tokens
+                .iter()
+                .position(|x| *x == Token::RuleOp)
+                .map(|i| tokens.split_at(i))
+            {
+                let (signature, _, body) = (&left, &right[0], &right[1..]);
+                let signature = tokens_to_values(signature).map_err(|x| {
+                    format!(
+                        "Line {}: Unexpected error '{}' in rule signature.",
+                        linenum, x
+                    )
+                })?;
+                if signature
+                    .get(1)
+                    .and_then(|name| {
+                        if let ASTValue::Literal(DBValue::RelationID(_)) = name {
+                            Some(name)
+                        } else {
+                            None
+                        }
+                    })
+                    .is_none()
+                {
+                    return Err(format!(
+                        "Line {}: Need at least one relation-id keyword in rule signature. ",
+                        linenum
+                    ));
+                }
+                let body = {
+                    let constraint = tokens_to_constraint(body.to_vec()).map_err(|x| {
+                        format!("Line {}: Unexpected error '{}' in rule body.", linenum, x)
+                    })?;
+                    if let Constraint::Intersections(b) = constraint {
+                        b
+                    } else {
+                        vec![constraint]
+                    }
+                };
+
+                constraints.push(MetaAST::Rule(signature, body));
+            } else {
+                let constraint = tokens_to_constraint(tokens).map_err(|x| {
+                    format!("Line {}: Unexpected error '{}' in constraint.", linenum, x)
+                })?;
+                constraints.push(MetaAST::Constraint(constraint))
+            }
+        }
+    }
+    Ok(constraints)
 }
