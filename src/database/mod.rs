@@ -13,9 +13,9 @@ use std::{
 use num_bigint::{BigInt, BigUint, ToBigUint};
 
 use self::{
-    backtracking::BacktrackingQuery,
+    backtracking::{BacktrackingQuery, Constraint},
     parser::MetaAST,
-    unification::{ASTValue, Bindings, Constraint, RelationID},
+    unification::{ASTValue, Bindings, RelationID},
 };
 
 #[derive(Clone, Debug)]

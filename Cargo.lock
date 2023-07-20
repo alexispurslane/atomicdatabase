@@ -39,6 +39,8 @@ dependencies = [
  "dashmap",
  "lazy-regex",
  "num-bigint",
+ "rand",
+ "rayon",
  "rustyline",
  "uuid",
 ]

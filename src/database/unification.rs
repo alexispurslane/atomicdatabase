@@ -1,13 +1,9 @@
 use core::fmt;
-use std::{
-    collections::HashMap,
-    iter::{empty, FlatMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 
-use crate::database::backtracking::BacktrackingQuery;
+use rand::{distributions::Alphanumeric, Rng};
 
-use super::{parser::VariableName, DBValue, Database};
+use super::{parser::VariableName, DBValue};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum GlobPosition {
@@ -26,6 +22,7 @@ pub enum ASTValue {
         glob_position: GlobPosition,
     },
 }
+
 impl fmt::Display for ASTValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -68,6 +65,10 @@ impl fmt::Display for ASTValue {
     }
 }
 
+pub fn fmt_values(av: &Vec<ASTValue>) -> String {
+    av.iter().map(|x| format!("{} ", x)).collect::<String>()
+}
+
 pub type RelationID = String;
 
 pub type Bindings = HashMap<VariableName, ASTValue>;
@@ -100,176 +101,130 @@ impl fmt::Display for EqOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Constraint {
-    Relation(RelationID, Vec<ASTValue>),
-    Unification(Vec<ASTValue>, Vec<ASTValue>),
-    Comparison(EqOp, ASTValue, ASTValue),
-    Not(Box<Constraint>),
-    Alternatives(Vec<Constraint>),
-    Intersections(Vec<Constraint>),
-}
-
-impl fmt::Display for Constraint {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Constraint::*;
-        match self {
-            Relation(rel, values) => {
-                write!(f, " {} {}", rel, values[0])?;
-                for val in values.iter().skip(1) {
-                    write!(f, " {}", val)?;
-                }
-                fmt::Result::Ok(())
-            }
-            Unification(av, bv) => {
-                for val in av.iter() {
-                    write!(f, "{} ", val)?;
-                }
-                write!(f, "~ ")?;
-                for val in bv.iter() {
-                    write!(f, "{} ", val)?;
-                }
-                fmt::Result::Ok(())
-            }
-            Comparison(op, a, b) => write!(f, "{} {} {}", a, op, b),
-            Not(constraint) => write!(f, "!{}", constraint),
-            Alternatives(av) => {
-                write!(f, "( ")?;
-                for (i, constraint) in av.iter().enumerate() {
-                    if i == av.len() - 1 {
-                        write!(f, "{}", constraint)?;
-                    } else {
-                        write!(f, "{};", constraint)?;
-                    }
-                }
-                write!(f, " )")
-            }
-            Intersections(av) => {
-                write!(f, "( ")?;
-                for (i, constraint) in av.iter().enumerate() {
-                    if i == av.len() - 1 {
-                        write!(f, "{}", constraint)?;
-                    } else {
-                        write!(f, "{},", constraint)?;
-                    }
-                }
-                write!(f, " )")
+pub fn unify_terms(
+    i: &ASTValue,
+    j: &ASTValue,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> Result<Bindings, Bindings> {
+    use ASTValue::*;
+    match (i, j) {
+        (Literal(x), Literal(y)) => {
+            if x != y {
+                Err(current_bindings.clone())
+            } else {
+                Ok(HashMap::new())
             }
         }
+        (Variable(x), vy @ Literal(_)) | (vy @ Literal(_), Variable(x)) => {
+            let mut safe_current_bindings = current_bindings.clone();
+            safe_current_bindings.remove(x);
+            if let Some(vx) = current_bindings.get(x).or(environment.get(x)) {
+                let partials = lax_unify(
+                    &vec![vx.clone()],
+                    &vec![vy.clone()],
+                    environment.clone(),
+                    &safe_current_bindings,
+                );
+                if let Ok(binds) = partials {
+                    let mut ret = HashMap::new();
+                    for (k, v) in binds.into_iter() {
+                        if !current_bindings.contains_key(&k) {
+                            ret.insert(k, v);
+                        }
+                    }
+                    Ok(ret)
+                } else {
+                    partials
+                }
+            } else {
+                Ok(HashMap::from([(x.clone(), vy.clone())]))
+            }
+        }
+        (xvar @ Variable(x), yvar @ Variable(y)) => {
+            let x_val = current_bindings
+                .get(x)
+                .or(environment.get(x))
+                .unwrap_or(xvar);
+            let y_val = current_bindings
+                .get(y)
+                .or(environment.get(y))
+                .unwrap_or(yvar);
+
+            let mut safe_current_bindings = current_bindings.clone();
+            safe_current_bindings.remove(x);
+            safe_current_bindings.remove(y);
+            if x_val == xvar && y_val == yvar {
+                Ok(HashMap::from([(x.clone(), Variable(y.clone()))]))
+            } else {
+                let partials = lax_unify(
+                    &vec![x_val.clone()],
+                    &vec![y_val.clone()],
+                    environment.clone(),
+                    &safe_current_bindings,
+                );
+                if let Ok(binds) = partials {
+                    let mut ret = HashMap::new();
+                    for (k, v) in binds {
+                        if !current_bindings.contains_key(&k) {
+                            ret.insert(k, v);
+                        }
+                    }
+                    Ok(ret)
+                } else {
+                    return partials;
+                }
+            }
+        }
+        (
+            Literal(DBValue::List(list)),
+            PatternMatch {
+                explicit_values,
+                is_glob,
+                glob_position,
+            },
+        )
+        | (
+            PatternMatch {
+                explicit_values,
+                is_glob,
+                glob_position,
+            },
+            Literal(DBValue::List(list)),
+        ) => {
+            let partials = unify_pattern_match(
+                list,
+                explicit_values,
+                is_glob,
+                glob_position,
+                current_bindings,
+            );
+            if let Ok(binds) = partials {
+                let mut ret = HashMap::new();
+                for (k, v) in binds {
+                    if !current_bindings.contains_key(&k) {
+                        ret.insert(k, v);
+                    }
+                }
+                Ok(ret)
+            } else {
+                return partials;
+            }
+        }
+        _ => Err(current_bindings.clone()),
     }
-}
-
-pub fn unify_wrap(
-    av: &Vec<ASTValue>,
-    bv: &Vec<ASTValue>,
-    bindings: Arc<Bindings>,
-) -> Option<Arc<Bindings>> {
-    let inner = (*bindings).clone();
-
-    lax_unify(av, bv, inner).ok().map(|x| Arc::new(x))
-}
-
-pub fn lax_unify_wrap(
-    av: &Vec<ASTValue>,
-    bv: &Vec<ASTValue>,
-    bindings: Arc<Bindings>,
-) -> Result<Arc<Bindings>, Arc<Bindings>> {
-    let inner = (*bindings).clone();
-    lax_unify(av, bv, inner).map_or_else(|x| Err(Arc::new(x)), |x| Ok(Arc::new(x)))
 }
 
 pub fn lax_unify(
     av: &Vec<ASTValue>,
     bv: &Vec<ASTValue>,
-    bindings: Bindings,
+    mut current_bindings: Bindings,
+    bindings: &Bindings,
 ) -> Result<Bindings, Bindings> {
-    let mut new_bindings = bindings.clone();
-    for (i, j) in av.into_iter().zip(bv) {
-        use ASTValue::*;
-        match (i, j) {
-            (Literal(x), Literal(y)) => {
-                if x == y {
-                    continue;
-                } else {
-                    return Err(new_bindings);
-                }
-            }
-            (Variable(x), vy @ Literal(_)) => {
-                if let Some(vx) = new_bindings.get(x) {
-                    let partials = lax_unify(&vec![vx.clone()], &vec![vy.clone()], new_bindings);
-                    if let Ok(binds) = partials {
-                        new_bindings = binds;
-                    } else {
-                        return partials;
-                    }
-                } else {
-                    new_bindings.insert(x.clone(), vy.clone());
-                }
-            }
-            (vx @ Literal(_), Variable(y)) => {
-                if let Some(vy) = new_bindings.get(y) {
-                    let partials = lax_unify(&vec![vx.clone()], &vec![vy.clone()], new_bindings);
-                    if let Ok(binds) = partials {
-                        new_bindings = binds;
-                    } else {
-                        return partials;
-                    }
-                } else {
-                    new_bindings.insert(y.clone(), vx.clone());
-                }
-            }
-            (Variable(x), Variable(y)) => {
-                let vy = Variable(y.clone());
-                new_bindings.insert(x.clone(), vy);
-            }
-            (
-                Literal(DBValue::List(list)),
-                PatternMatch {
-                    explicit_values,
-                    is_glob,
-                    glob_position,
-                },
-            ) => {
-                let partials = unify_pattern_match(
-                    list,
-                    explicit_values,
-                    is_glob,
-                    glob_position,
-                    new_bindings,
-                );
-                if let Ok(binds) = partials {
-                    new_bindings = binds;
-                } else {
-                    return partials;
-                }
-            }
-            (
-                PatternMatch {
-                    explicit_values,
-                    is_glob,
-                    glob_position,
-                },
-                Literal(DBValue::List(list)),
-            ) => {
-                let partials = unify_pattern_match(
-                    list,
-                    explicit_values,
-                    is_glob,
-                    glob_position,
-                    new_bindings,
-                );
-                if let Ok(binds) = partials {
-                    new_bindings = binds;
-                } else {
-                    return partials;
-                }
-            }
-            _ => {
-                return Err(new_bindings);
-            }
-        }
+    for (i, j) in av.iter().zip(bv) {
+        current_bindings.extend(unify_terms(i, j, &current_bindings, &bindings.clone())?);
     }
-    Ok(new_bindings)
+    Ok(current_bindings)
 }
 
 pub fn unify_pattern_match(
@@ -277,13 +232,14 @@ pub fn unify_pattern_match(
     explicit_values: &Vec<ASTValue>,
     is_glob: &bool,
     glob_position: &GlobPosition,
-    new_bindings: Bindings,
+    new_bindings: &Bindings,
 ) -> Result<Bindings, Bindings> {
     use ASTValue::*;
     let partials = if !is_glob {
         lax_unify(
             &explicit_values,
             &list.clone().into_iter().map(|x| Literal(x)).collect(),
+            new_bindings.clone(),
             new_bindings,
         )
     } else {
@@ -297,6 +253,7 @@ pub fn unify_pattern_match(
                     .take(n)
                     .map(|x| Literal(x))
                     .collect(),
+                new_bindings.clone(),
                 new_bindings,
             ),
             GlobPosition::Tail => lax_unify(
@@ -308,6 +265,7 @@ pub fn unify_pattern_match(
                     .take(n)
                     .map(|x| Literal(x))
                     .collect(),
+                new_bindings.clone(),
                 new_bindings,
             ),
             GlobPosition::Middle => {
@@ -319,6 +277,7 @@ pub fn unify_pattern_match(
                         &explicit_values,
                         &list[i..i + n].to_vec(),
                         new_bindings.clone(),
+                        new_bindings,
                     );
                     if partials.is_ok() {
                         output = partials;
@@ -371,204 +330,40 @@ pub fn unify_compare(op: &EqOp, a: &ASTValue, b: &ASTValue, bindings: Arc<Bindin
     }
 }
 
-type BindingsIterator<'a> = Box<dyn Iterator<Item = Result<Arc<Bindings>, Arc<Bindings>>> + 'a>;
-
-pub struct InnerFactPossibilitiesIter {
-    pub database: Arc<Database>,
-    pub id: RelationID,
-    pub bindings: Arc<Bindings>,
-    pub tokens: Vec<ASTValue>,
-    fact_index: usize,
-}
-
-impl InnerFactPossibilitiesIter {
-    pub fn new(
-        id: RelationID,
-        tokens: Vec<ASTValue>,
-        database: Arc<Database>,
-        bindings: Arc<Bindings>,
-    ) -> Self {
-        Self {
-            id,
-            database,
-            bindings,
-            tokens,
-            fact_index: 0,
-        }
+pub fn fmt_ptr_bindings(b: &Bindings) -> String {
+    let mut s = String::new();
+    s.push_str("{{ ");
+    let mut keyvals = b.iter().collect::<Vec<(_, _)>>();
+    keyvals.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+    for (k, v) in keyvals {
+        s.push_str(&format!("{} ~ {}, ", k, v));
     }
+    s.push_str("}}");
+    s
 }
 
-impl Iterator for InnerFactPossibilitiesIter {
-    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(facts) = self.database.facts.get(&self.id) {
-            if self.fact_index < facts.len() {
-                let fact = &facts[self.fact_index];
-                let fact_tokens = fact.iter().map(|x| ASTValue::Literal(x.clone())).collect();
-                self.fact_index += 1;
-                Some(lax_unify_wrap(
-                    &self.tokens,
-                    &fact_tokens,
-                    self.bindings.clone(),
-                ))
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
+pub fn unify_get_variable_value(
+    varname: &String,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> Option<ASTValue> {
+    let get_name = format!(
+        "GETVALUE#{}",
+        rand::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(3)
+            .map(char::from)
+            .collect::<String>(),
+    );
+    let lvalue = vec![ASTValue::Variable(get_name.clone())];
+    let rvalue = vec![ASTValue::Variable(varname.clone())];
+    lax_unify(&lvalue, &rvalue, current_bindings.clone(), &environment)
+        .ok()
+        .expect(&format!("Cannot unify {} with a variable?!", rvalue[0]))
+        .get(&get_name)
+        .map(|x| x.clone())
 }
 
-pub struct PossibleBindings<'b> {
-    pub constraint: Arc<Constraint>,
-    pub database: Arc<Database>,
-    pub bindings: Arc<Bindings>,
-    current_fact_possibilities: BindingsIterator<'b>,
-    current_rule_possibilities: BindingsIterator<'b>,
-    done: bool,
-}
-
-impl<'b> PossibleBindings<'b> {
-    pub fn new(
-        constraint: Arc<Constraint>,
-        database: Arc<Database>,
-        bindings: Arc<Bindings>,
-    ) -> Self {
-        Self {
-            constraint,
-            database,
-            bindings,
-            current_fact_possibilities: Box::new(empty()),
-            current_rule_possibilities: Box::new(empty()),
-            done: false,
-        }
-    }
-    pub fn new_with_bindings(
-        constraint: Arc<Constraint>,
-        database: Arc<Database>,
-        bindings: Arc<Bindings>,
-        possibilities: Vec<Arc<Bindings>>,
-    ) -> Self {
-        Self {
-            constraint,
-            database,
-            bindings,
-            current_fact_possibilities: Box::new(possibilities.into_iter().map(|x| Ok(x))),
-            current_rule_possibilities: Box::new(empty()),
-            done: true,
-        }
-    }
-}
-
-impl<'b> Iterator for PossibleBindings<'b> {
-    type Item = Result<Arc<Bindings>, Arc<Bindings>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        use Constraint::*;
-        if let Some(binding) = self.current_fact_possibilities.next() {
-            Some(binding)
-        } else if let Some(binding) = self.current_rule_possibilities.next() {
-            Some(binding)
-        } else if !self.done {
-            match self.constraint.as_ref() {
-                Relation(id, tokens) => {
-                    self.current_fact_possibilities = Box::new(InnerFactPossibilitiesIter::new(
-                        id.to_string(),
-                        tokens.to_vec(),
-                        self.database.clone(),
-                        self.bindings.clone(),
-                    ));
-                    let db = self.database.rules.read().unwrap();
-                    let val = db.get(id);
-                    if let Some((params, constraints)) = val {
-                        println!("{:?}", constraints);
-                        if let Some(args) = unify_wrap(&tokens, &params, self.bindings.clone()) {
-                            let possible_binds = BacktrackingQuery::new(
-                                constraints.into_iter().map(|a| a.clone()).collect(),
-                                self.database.clone(),
-                                args.clone(),
-                            )
-                            .map(|x| Ok(x));
-                            self.current_rule_possibilities = Box::new(possible_binds);
-                        }
-                    }
-                }
-
-                Comparison(op, a, b) => {
-                    if unify_compare(&op, &a, &b, self.bindings.clone()) {
-                        self.current_fact_possibilities =
-                            Box::new(vec![Ok(self.bindings.clone())].into_iter());
-                    } else {
-                        self.current_fact_possibilities = Box::new(empty());
-                    }
-                }
-
-                Unification(avs, bvs) => {
-                    if let Some(new_bindings) = unify_wrap(avs, bvs, self.bindings.clone()) {
-                        self.current_fact_possibilities =
-                            Box::new(vec![Ok(new_bindings)].into_iter());
-                    } else {
-                        self.current_fact_possibilities = Box::new(empty());
-                    }
-                }
-
-                Not(constraint) => {
-                    let shadow_binding = self.bindings.clone();
-                    let shadow_database = self.database.clone();
-                    self.current_fact_possibilities = Box::new(
-                        PossibleBindings::new(
-                            (*constraint).clone().into(),
-                            shadow_database.clone(),
-                            shadow_binding.clone(),
-                        )
-                        .map(|x| {
-                            println!("{:?}", x);
-                            x.map_or_else(|x| Ok(x), |x| Err(x))
-                        }),
-                    );
-                }
-
-                Alternatives(av) => {
-                    let shadow_binding = self.bindings.clone();
-                    let shadow_database = self.database.clone();
-                    let possibilities = construct_alternatives(
-                        av.clone(),
-                        shadow_database.clone(),
-                        shadow_binding.clone(),
-                    );
-                    self.current_fact_possibilities = Box::new(possibilities);
-                }
-                Intersections(av) => {
-                    let possible_binds = BacktrackingQuery::new(
-                        av.into_iter().map(|a| Arc::new(a.clone())).collect(),
-                        self.database.clone(),
-                        self.bindings.clone(),
-                    )
-                    .map(|x| Ok(x));
-                    self.current_fact_possibilities = Box::new(possible_binds);
-                }
-                _ => unimplemented!(),
-            }
-            self.done = true;
-            if let Some(binding) = self.current_fact_possibilities.next() {
-                Some(binding)
-            } else if let Some(binding) = self.current_rule_possibilities.next() {
-                Some(binding)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-}
-
-fn construct_alternatives<'a>(
-    av: Vec<Constraint>,
-    database: Arc<Database>,
-    bindings: Arc<Bindings>,
-) -> impl Iterator<Item = Result<Arc<Bindings>, Arc<Bindings>>> {
-    av.into_iter()
-        .flat_map(move |a| PossibleBindings::new(Arc::new(a), database.clone(), bindings.clone()))
+pub fn fmt_arc_bindings(b: Arc<Bindings>) -> String {
+    fmt_ptr_bindings(b.as_ref())
 }

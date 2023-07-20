@@ -1,7 +1,8 @@
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
 
 use super::{
-    unification::{ASTValue, Constraint, EqOp, GlobPosition},
+    backtracking::Constraint,
+    unification::{ASTValue, EqOp, GlobPosition},
     DBValue,
 };
 
@@ -32,6 +33,7 @@ pub enum Token {
     IntermediateGroup(String),
     NOP,
     StatementEnd,
+    Comment,
 }
 
 pub trait ToASTValue {
@@ -123,6 +125,7 @@ pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
         '<' => Ok(Token::EqOp(EqOp::LessThan)),
         '>' => Ok(Token::EqOp(EqOp::GreaterThan)),
         '=' => Ok(Token::EqOp(EqOp::EqualTo)),
+        '%' => Ok(Token::Comment),
         // for the next two: we need to start a number that has no digits, but
         // obviously that's nonsensical, so we need to put some digit in there,
         // but a digit we can distinguish from one that was put in there by a
@@ -174,6 +177,14 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                 }
                 current_token = Some(char_starts_token(i, c)?);
                 false
+            }
+            Some(Token::Comment) => {
+                if c == '%' || c == '\n' {
+                    current_token = None;
+                    false
+                } else {
+                    false
+                }
             }
             Some(Token::Text(ref mut s)) => {
                 if c == '"' {
@@ -440,13 +451,25 @@ pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
             _ => panic!("How could this happen? We're smarter than this!"),
         }
     } else {
+        if let Some(Token::RelationID(r)) = tokens.get(0) {
+            if (r == "fail" || r == "succeed") && tokens.len() > 1 {
+                return Err(format!(
+                    "Unexpected extra tokens after terminator constraint `{}`.",
+                    r
+                ));
+            }
+            if r == "FAIL" {
+                return Ok(Constraint::Fail);
+            } else if r == "SUCCEED" {
+                return Ok(Constraint::Succeed);
+            }
+        }
         if let Some(Token::RelationID(r)) = tokens.get(1) {
             Ok(Constraint::Relation(
                 r.to_string(),
                 tokens_to_values(&[&tokens[0..1], &tokens[2..]].concat())?,
             ))
         } else if let Some(Token::Group(group)) = tokens.get(0) {
-            println!("{:?}", tokens);
             if tokens.len() == 1 {
                 tokens_to_constraint(group.to_vec())
             } else {
@@ -495,6 +518,8 @@ pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
     let mut constraints = vec![];
     for (linenum, tokens) in statements.into_iter().enumerate() {
         if let Ok(fact) = tokens_to_dbvalues(tokens.clone()) {
+            // statement can be interpreted as a pure fact, so do that, since
+            // it's the fastest option
             constraints.push(MetaAST::Fact(fact));
         } else {
             if let Some((left, right)) = tokens
@@ -502,6 +527,7 @@ pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
                 .position(|x| *x == Token::RuleOp)
                 .map(|i| tokens.split_at(i))
             {
+                // If there's a colon in this statement, it's a rule definition
                 let (signature, _, body) = (&left, &right[0], &right[1..]);
                 let signature = tokens_to_values(signature).map_err(|x| {
                     format!(
@@ -538,6 +564,7 @@ pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
 
                 constraints.push(MetaAST::Rule(signature, body));
             } else {
+                // Otherwise it's a direct constraint/query
                 let constraint = tokens_to_constraint(tokens).map_err(|x| {
                     format!("Line {}: Unexpected error '{}' in constraint.", linenum, x)
                 })?;

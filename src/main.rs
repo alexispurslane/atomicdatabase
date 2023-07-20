@@ -1,38 +1,39 @@
 use std::env;
-use std::fs::{read_to_string, OpenOptions};
+use std::fs::OpenOptions;
 use std::io::prelude::*;
-use std::os::unix::prelude::FileExt;
 use std::{collections::HashMap, sync::Arc};
 
 use database::{backtracking::BacktrackingQuery, parser::parse_fact, Database};
-use rustyline::error::ReadlineError;
 
-use crate::database::parser::{parse_file, parse_line, tokenize_line, tokens_to_values};
+use crate::database::parser::{parse_file, parse_line};
 
 mod database;
 
-macro_rules! fact {
-    ($db: ident, $($t:tt)*) => {
-        $db.insert_fact(parse_fact(stringify!($($t)*).to_string()).unwrap())
-    };
-}
+/////////////////////////////////////////////////////////////////////////////////////////////////////
+// macro_rules! fact {                                                                             //
+//     ($db: ident, $($t:tt)*) => {                                                                //
+//         $db.insert_fact(parse_fact(stringify!($($t)*).to_string()).unwrap())                    //
+//     };                                                                                          //
+// }                                                                                               //
+//                                                                                                 //
+// macro_rules! query {                                                                            //
+//     ($($t:tt)+) => {                                                                            //
+//         vec![Arc::new(parse_line(stringify!($($t)*).to_string()).unwrap())]                     //
+//     }                                                                                           //
+// }                                                                                               //
+//                                                                                                 //
+// macro_rules! rule {                                                                             //
+//     ($db:ident, $name:ident ( $($a:ident)+ ) => $($t:tt)+) => {                                 //
+//         $db.insert_rule(                                                                        //
+//             stringify!($name).to_string().to_uppercase(),                                       //
+//             tokens_to_values(&tokenize_line(stringify!($($a)+).to_string()).unwrap()).unwrap(), //
+//             query!($($t)+),                                                                     //
+//         )?;                                                                                     //
+//     }                                                                                           //
+// }                                                                                               //
+/////////////////////////////////////////////////////////////////////////////////////////////////////
 
-macro_rules! query {
-    ($($t:tt)+) => {
-        vec![Arc::new(parse_line(stringify!($($t)*).to_string()).unwrap())]
-    }
-}
-
-macro_rules! rule {
-    ($db:ident, $name:ident ( $($a:ident)+ ) => $($t:tt)+) => {
-        $db.insert_rule(
-            stringify!($name).to_string().to_uppercase(),
-            tokens_to_values(&tokenize_line(stringify!($($a)+).to_string()).unwrap()).unwrap(),
-            query!($($t)+),
-        )?;
-    }
-}
-
+static BLUE: &'static str = "\x1b[1;34m";
 static GREEN_MESSAGE: &'static str = "\x1b[1;32m";
 static NORMAL: &'static str = "\x1b[0m";
 static RED_MESSAGE: &'static str = "\x1b[1;31m";
@@ -80,7 +81,7 @@ fn main() -> Result<(), String> {
     for statement in meta_ast {
         let query = Database::evaluate(db.clone(), bindings.clone(), statement)?;
         if let Some(query) = query {
-            explore_query(&mut rl, query, false)?;
+            explore_query(&mut rl, query, false);
         }
     }
 
@@ -97,7 +98,7 @@ fn main() -> Result<(), String> {
     println!("{} rules loaded", db.rules.read().unwrap().len());
 
     loop {
-        let readline = rl.readline(">> ");
+        let readline = rl.readline(&format!("{}>> {}", BLUE, NORMAL));
 
         match readline {
             Ok(line) => {
@@ -201,24 +202,33 @@ fn explore_query<'a>(
     rl: &mut rustyline::DefaultEditor,
     query: BacktrackingQuery<'a>,
     confirm_continue: bool,
-) -> Result<(), String> {
+) {
+    let mut solutions = false;
     for (i, solution) in query.enumerate() {
-        println!("{}Solution {}: {}", GREEN_MESSAGE, i, NORMAL);
-        for (k, v) in solution.iter() {
-            println!("    {} ~ {}", k, v);
-        }
-        if confirm_continue {
+        if confirm_continue && i != 0 {
             let confirm = rl
                 .readline("(press enter for next solution, n to stop)>> ")
-                .map_err(|_| "Can't prompt with readline!")?;
+                .map_err(|_| "Can't prompt with readline!")
+                .unwrap();
             if confirm.to_lowercase().contains("n") {
                 break;
             } else {
                 print!("{}", "\x1b[s\x1b[1A\x1b[2K\x1b[u");
             }
         }
+
+        solutions = true;
+        println!("{}Solution {}: {}", GREEN_MESSAGE, i, NORMAL);
+        for (k, v) in solution.iter() {
+            println!("    {} ~ {}", k, v);
+        }
+        println!("");
+        println!("{}Ok.{}", GREEN_MESSAGE, NORMAL);
     }
-    Ok(())
+    if !solutions {
+        println!("");
+        println!("{}No.{}", RED_MESSAGE, NORMAL);
+    }
 }
 
 fn print_banner() {

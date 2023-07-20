@@ -1,3 +1,5 @@
+% -------------- Facts -------------- %
+
 "Rudolf I" father of "Frederick III".
 "Frederick III" father of "Maximiliaan I".
 "Jan II" mother of "Filips de Stoute".
@@ -16,6 +18,7 @@
 "Isabella I" mother of "Johanna de Waanzinnige".
 "Filips I de Schone" father of "Eleonora".
 "Johanna de Waanzinnige" mother of "Eleonora".
+"Frans I" partners with "Eleonora".
 "Filips I de Schone" father of "Karel V".
 "Johanna de Waanzinnige" mother of "Karel V".
 "Filips I de Schone" father of "Ferdinand I".
@@ -24,9 +27,81 @@
 "Johanna de Waanzinnige" mother of "Maria v Hongarije".
 "Karel V" father of "Filips II".
 "Karel V" father of "Margaretha v Parma".
+"Margaretha v Parma" mother of "Alexander Farnese".
+"Ferdinand I" father of "Maximiliaan II".
+"Ferdinand I" father of "Karel v Stiermarken".
+"Karel v Stiermarken" father of "Ferdinand II".
+"Ferdinand II" father of "Ferdinand III".
+"Maximiliaan II" father of "Rudolf II".
+"Maximiliaan II" father of "Matthias".
+"Maximiliaan II" father of "Albrecht".
+"Filips II" father of "Filips III".
+"Filips II" father of "Filips IV".
+"Filips II" father of "Isabella".
+"Isabella" partners with "Albrecht".
+"Filips IV" father of "Maria Teresia".
+"Filips IV" father of "Karel II".
+"Filips IV" father of "Margareta Teresia".
+"Lodewijk IX" father of "Lodewijk XIV".
+"Ferdinand III" father of "Leopold I".
+"Lodewijk XIV" father of "Lodewijk le Grand Dauphin".
+"Maria Teresia" mother of "Lodewijk le Grand Dauphin".
+"Leopold I" father of "Jozef I".
+"Margareta Teresia" mother of "Jozef I".
+"Leopold I" father of "Karel VI".
+"Margareta Teresia" mother of "Karel VI".
+"Lodewijk le Grand Dauphin" father of "Lodewijk hertog v Bourgondie".
+"Lodewijk le Grand Dauphin" father of "Filips V".
+"Karel VI" father of "Maria Theresia".
+"Frans I v Lotharingen" father of "Jozef II".
+"Maria Theresia" mother of "Jozef II".
+"Frans I v Lotharingen" father of "Leopold II".
+"Maria Theresia" mother of "Leopold II".
+"Leopold II" father of "Frans II".
+"Frans II" father of "Ferdinand I".
+"Frans II" father of "Frans Karel".
+"Frans Karel" father of "Frans Jozef I".
+"Frans Karel" father of "Maximiliaan keizer v Mexico".
+"Frans Karel" father of "Karel Lodewijk".
+"Frans Jozef I" father of "Rudolf".
+"Karel Lodewijk" father of "Frans Ferdinand".
+"Karel Lodewijk" father of "Otto".
+"Otto" father of "Karel I".
+"Karel I" father of "Otto II".
+"Lodewijk hertog v Bourgondie" father of "Lodewijk XV".
+"Lodewijk XV" father of "Lodewijk de Dauphin".
+"Lodewijk de Dauphin" father of "Lodewijk XVI".
+"Lodewijk XVI" father of "Lodewijk XVII".
+"Lodewijk de Dauphin" father of "Lodewijk XVIII".
+"Lodewijk de Dauphin" father of "Karel X".
+"Filips V" father of "Ferdinand VI".
+"Filips V" father of "Karel III".
+"Karel III" father of "Karel IV".
+"Karel IV" father of "Ferdinand VII".
+"Ferdinand VII" father of "Isabella II".
+"Isabella II" mother of "Alfons XII".
+"Alfons XII" father of "Alfons XIII".
+"Alfons XIII" father of "Alfonso".
+"Alfons XIII" father of "Juan".
+"Juan" father of "Juan Carlos I".
+
+% -------------- Rules -------------- %
+
+X parent of Y:
+    X mother of Y;
+    X father of Y.
+
+X siblings with Y:
+    T parent of Y,
+    T parent of X.
 
 X partners with Y:
     X father of T,
     Y mother of T.
 
-A partners with B.
+X cousins with Y:
+    T parent of X,
+    U parent of Y,
+    U siblings of T.
+
+% -------------- Queries -------------- %
