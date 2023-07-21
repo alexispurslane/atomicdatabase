@@ -98,7 +98,7 @@ impl PartialOrd for DBValue {
 
 pub struct Database {
     pub facts: DashMap<RelationID, Vec<Vec<DBValue>>>,
-    pub rules: RwLock<HashMap<RelationID, (Vec<ASTValue>, Vec<Arc<Constraint>>)>>,
+    pub rules: RwLock<HashMap<RelationID, Vec<(Vec<ASTValue>, Vec<Arc<Constraint>>)>>>,
 }
 
 impl Database {
@@ -115,10 +115,15 @@ impl Database {
         args: Vec<ASTValue>,
         constraints: Vec<Arc<Constraint>>,
     ) -> Result<(), String> {
-        self.rules
+        let mut rules = self
+            .rules
             .write()
-            .map_err(|e| format!("Error writing rule {} to database: '{}'. ", id, e))?
-            .insert(id.to_uppercase(), (args, constraints.clone()));
+            .map_err(|e| format!("Error writing rule {} to database: '{}'. ", id, e))?;
+        if let Some(rule_guards) = rules.get_mut(&id.to_uppercase()) {
+            rule_guards.push((args, constraints.clone()));
+        } else {
+            rules.insert(id.to_uppercase(), vec![(args, constraints.clone())]);
+        }
         Ok(())
     }
 

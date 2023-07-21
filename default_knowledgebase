@@ -93,7 +93,8 @@ X parent of Y:
 
 X siblings with Y:
     T parent of Y,
-    T parent of X.
+    T parent of X,
+    !X = Y.
 
 X partners with Y:
     X father of T,
@@ -102,6 +103,9 @@ X partners with Y:
 X cousins with Y:
     T parent of X,
     U parent of Y,
-    U siblings of T.
+    U siblings with T.
 
 % -------------- Queries -------------- %
+
+X foo less_than_two: X < 2 .
+X foo less_than_five: X < 5 .

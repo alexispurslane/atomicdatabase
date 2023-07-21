@@ -1,5 +1,9 @@
 use std::fmt;
+use std::fmt::Debug;
+use std::marker::PhantomData;
 use std::sync::Arc;
+use std::sync::RwLock;
+use std::sync::RwLockReadGuard;
 
 use super::unification::*;
 use super::ASTValue;
@@ -25,7 +29,7 @@ impl fmt::Display for Constraint {
         use Constraint::*;
         match self {
             Relation(rel, values) => {
-                write!(f, " {} {}", rel, values[0])?;
+                write!(f, "{} <{}>", values[0], rel)?;
                 for val in values.iter().skip(1) {
                     write!(f, " {}", val)?;
                 }
@@ -77,6 +81,7 @@ pub struct BacktrackingQuery<'a> {
     pub database: Arc<Database>,
     pub bindings: Arc<Bindings>,
     constraint_stack: Vec<PossibleBindings<'a>>,
+    depth: usize,
 }
 
 impl<'a> BacktrackingQuery<'a> {
@@ -91,7 +96,34 @@ impl<'a> BacktrackingQuery<'a> {
             database,
             bindings,
             constraint_stack: Vec::with_capacity(len),
+            depth: 0,
         }
+    }
+
+    pub fn new_depth(
+        constraints: Vec<Arc<Constraint>>,
+        database: Arc<Database>,
+        bindings: Arc<Bindings>,
+        depth: usize,
+    ) -> Self {
+        let len = constraints.len();
+        BacktrackingQuery {
+            constraints,
+            database,
+            bindings,
+            constraint_stack: Vec::with_capacity(len),
+            depth: depth + 1,
+        }
+    }
+}
+
+impl Debug for BacktrackingQuery<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Query (\n")?;
+        for constraint in self.constraints.iter() {
+            write!(f, "    {}.\n", constraint)?;
+        }
+        write!(f, ")")
     }
 }
 
@@ -101,30 +133,30 @@ impl Iterator for BacktrackingQuery<'_> {
     fn next(&mut self) -> Option<Arc<Bindings>> {
         loop {
             let current_constraint_index = self.constraint_stack.len();
+            println!("constraint stack length: {}", current_constraint_index);
             // Satisfy all the constraints
             if let Some(new_constraint) = self.constraints.get(current_constraint_index) {
-                let mut only_possible = PossibleBindings::new_with_bindings(
-                    new_constraint.clone(),
-                    self.database.clone(),
-                    self.bindings.clone(),
-                    vec![self.bindings.clone()],
-                );
-                let last_possible_bindings = self
+                let last_binding = self
                     .constraint_stack
                     .last_mut()
-                    .unwrap_or(&mut only_possible);
-                if let Some(possible_binding) = last_possible_bindings.next() {
-                    if let Ok(possible_binding) = possible_binding {
+                    .map_or(Some(Ok(self.bindings.clone())), |x| x.next());
+                println!("Called last_binding next()");
+                if let Some(last_binding) = last_binding {
+                    if let Ok(environment) = last_binding {
                         println!(
-                            "\nConstraint call:\n  constraint: {}\n  environment: {}",
+                            " {}>: {} {}",
+                            (0..(self.constraint_stack.len() + self.depth))
+                                .map(|_| '-')
+                                .collect::<String>(),
                             new_constraint,
-                            fmt_arc_bindings(possible_binding.clone())
+                            fmt_arc_bindings(environment.clone())
                         );
                         // possible bindings for this next branch given the next possible binding for the previous branch
                         let new_possible_bindings = PossibleBindings::new(
                             new_constraint.clone(),
                             self.database.clone(),
-                            possible_binding.clone(),
+                            environment.clone(),
+                            self.depth,
                         );
                         self.constraint_stack.push(new_possible_bindings);
                     } else {
@@ -133,8 +165,14 @@ impl Iterator for BacktrackingQuery<'_> {
                     }
                 } else {
                     // This branch is exhausted, go up!
-                    println!("Constraint exhausted\n");
                     self.constraint_stack.pop();
+                    println!(
+                        "{}<- {}",
+                        (0..(self.constraint_stack.len() + self.depth - 1))
+                            .map(|_| ' ')
+                            .collect::<String>(),
+                        new_constraint
+                    );
                     if self.constraint_stack.is_empty() {
                         // We've exhausted even the first constraint, so we're done here
                         return None;
@@ -146,6 +184,7 @@ impl Iterator for BacktrackingQuery<'_> {
                 // branch! If we've run out of possible values, go up a branch
                 // and try more possible values there to produce more here
                 if let Some(lbs) = self.constraint_stack.last_mut() {
+                    println!("Called final binding next()");
                     if let Some(binding) = lbs.next() {
                         if let Ok(binding) = binding {
                             return Some(binding);
@@ -225,9 +264,11 @@ fn construct_alternatives<'a>(
     av: Vec<Constraint>,
     database: Arc<Database>,
     bindings: Arc<Bindings>,
+    depth: usize,
 ) -> impl Iterator<Item = Result<Arc<Bindings>, Arc<Bindings>>> {
-    av.into_iter()
-        .flat_map(move |a| PossibleBindings::new(Arc::new(a), database.clone(), bindings.clone()))
+    av.into_iter().flat_map(move |a| {
+        PossibleBindings::new(Arc::new(a), database.clone(), bindings.clone(), depth)
+    })
 }
 
 pub struct PossibleBindings<'b> {
@@ -236,7 +277,9 @@ pub struct PossibleBindings<'b> {
     pub bindings: Arc<Bindings>,
     current_fact_possibilities: BindingsIterator<'b>,
     current_rule_possibilities: BindingsIterator<'b>,
-    done: bool,
+    constraints_done: bool,
+    rules_index: usize,
+    depth: usize,
 }
 
 impl<'b> PossibleBindings<'b> {
@@ -244,6 +287,7 @@ impl<'b> PossibleBindings<'b> {
         constraint: Arc<Constraint>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
+        depth: usize,
     ) -> Self {
         Self {
             constraint,
@@ -251,14 +295,18 @@ impl<'b> PossibleBindings<'b> {
             bindings,
             current_fact_possibilities: Box::new(empty()),
             current_rule_possibilities: Box::new(empty()),
-            done: false,
+            constraints_done: false,
+            rules_index: 0,
+            depth: depth + 1,
         }
     }
+
     pub fn new_with_bindings(
         constraint: Arc<Constraint>,
         database: Arc<Database>,
         bindings: Arc<Bindings>,
         possibilities: Vec<Arc<Bindings>>,
+        depth: usize,
     ) -> Self {
         Self {
             constraint,
@@ -266,7 +314,32 @@ impl<'b> PossibleBindings<'b> {
             bindings,
             current_fact_possibilities: Box::new(possibilities.into_iter().map(|x| Ok(x))),
             current_rule_possibilities: Box::new(empty()),
-            done: true,
+            constraints_done: true,
+            rules_index: 0,
+            depth: depth + 1,
+        }
+    }
+
+    fn get_possible_rule<'a>(
+        &self,
+        db_rules: &'a RwLockReadGuard<
+            HashMap<RelationID, Vec<(Vec<ASTValue>, Vec<Arc<Constraint>>)>>,
+        >,
+    ) -> Option<&'a (Vec<ASTValue>, Vec<Arc<Constraint>>)> {
+        if let Constraint::Relation(id, _) = self.constraint.as_ref() {
+            db_rules.get(id).and_then(|x| {
+                let res = x.get(self.rules_index);
+                if let Some(res) = res {
+                    print!("Rule {}: ", self.rules_index);
+                    for c in res.1.iter() {
+                        print!("{}, ", c);
+                    }
+                    println!(".");
+                }
+                res
+            })
+        } else {
+            None
         }
     }
 }
@@ -276,11 +349,16 @@ impl<'b> Iterator for PossibleBindings<'b> {
 
     fn next(&mut self) -> Option<Self::Item> {
         use Constraint::*;
+
+        let db = self.database.clone();
+        let db_rules = db.rules.read().unwrap();
+        let possible_rule = self.get_possible_rule(&db_rules);
+
         if let Some(binding) = self.current_fact_possibilities.next() {
             Some(binding)
         } else if let Some(binding) = self.current_rule_possibilities.next() {
             Some(binding)
-        } else if !self.done {
+        } else if !self.constraints_done || possible_rule.is_some() {
             match self.constraint.as_ref() {
                 Relation(id, tokens) => {
                     self.current_fact_possibilities = Box::new(InnerFactPossibilitiesIter::new(
@@ -289,23 +367,22 @@ impl<'b> Iterator for PossibleBindings<'b> {
                         self.database.clone(),
                         self.bindings.clone(),
                     ));
-                    let db = self.database.rules.read().unwrap();
-                    if let Some((params, constraints)) = db.get(id) {
+                    if let Some((params, constraints)) = possible_rule {
                         let args = split_arguments(&tokens, &params, self.bindings.clone());
                         if let Ok((outer_args, inner_args)) = args {
-                            let possible_binds = BacktrackingQuery::new(
+                            let possible_binds = BacktrackingQuery::new_depth(
                                 constraints.into_iter().map(|a| a.clone()).collect(),
                                 self.database.clone(),
                                 Arc::new(inner_args),
+                                self.depth,
                             )
                             .map(reduce_and_eliminate_wrap(
                                 Arc::new(outer_args),
                                 self.bindings.clone(),
                             ));
                             self.current_rule_possibilities = Box::new(possible_binds);
-                        } else if let Err(ref args) = args {
-                            println!("Failed rule call: {}", fmt_ptr_bindings(args));
                         }
+                        self.rules_index += 1;
                     }
                 }
 
@@ -337,6 +414,7 @@ impl<'b> Iterator for PossibleBindings<'b> {
                             (*constraint).clone().into(),
                             shadow_database.clone(),
                             shadow_binding.clone(),
+                            self.depth,
                         )
                         .map(|x| x.map_or_else(|x| Ok(x), |x| Err(x))),
                     );
@@ -349,14 +427,16 @@ impl<'b> Iterator for PossibleBindings<'b> {
                         av.clone(),
                         shadow_database.clone(),
                         shadow_binding.clone(),
+                        self.depth,
                     );
                     self.current_fact_possibilities = Box::new(possibilities);
                 }
                 Intersections(av) => {
-                    let possible_binds = BacktrackingQuery::new(
+                    let possible_binds = BacktrackingQuery::new_depth(
                         av.into_iter().map(|a| Arc::new(a.clone())).collect(),
                         self.database.clone(),
                         self.bindings.clone(),
+                        self.depth,
                     )
                     .map(|x| Ok(x));
                     self.current_fact_possibilities = Box::new(possible_binds);
@@ -370,14 +450,8 @@ impl<'b> Iterator for PossibleBindings<'b> {
                         Box::new(vec![Ok(self.bindings.clone())].into_iter());
                 }
             }
-            self.done = true;
-            if let Some(binding) = self.current_fact_possibilities.next() {
-                Some(binding)
-            } else if let Some(binding) = self.current_rule_possibilities.next() {
-                Some(binding)
-            } else {
-                None
-            }
+            self.constraints_done = true;
+            self.next()
         } else {
             None
         }
@@ -394,7 +468,6 @@ pub fn split_arguments(
     let mut outer_bindings = (*environment).clone();
     let mut inner_bindings = HashMap::new();
     for (otok, itok) in outer_tokens.iter().zip(inner_tokens) {
-        println!("Unification: {} == {}", otok, itok);
         match (otok, itok) {
             (Variable(_), Literal(_)) => {
                 outer_bindings.extend(unify_terms(&otok, &itok, &outer_bindings, &environment)?);
@@ -430,7 +503,7 @@ pub fn split_arguments(
         }
     }
     println!(
-        "Rule call:\n  return values: {}\n  arguments: {}",
+        "{} {}",
         fmt_ptr_bindings(&outer_bindings),
         fmt_ptr_bindings(&inner_bindings)
     );
@@ -448,9 +521,10 @@ pub fn reduce_and_eliminate(
             if let Some(val) = unify_get_variable_value(varname2, &bindings, &environment) {
                 new_bindings.insert(varname.to_string(), val);
             }
+        } else if let ASTValue::Literal(_) = varval {
+            new_bindings.insert(varname.to_string(), varval.clone());
         }
     }
-    println!("Rule return: {}", fmt_ptr_bindings(&new_bindings));
     new_bindings
 }
 

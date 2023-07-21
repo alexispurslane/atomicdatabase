@@ -69,6 +69,10 @@ pub fn fmt_values(av: &Vec<ASTValue>) -> String {
     av.iter().map(|x| format!("{} ", x)).collect::<String>()
 }
 
+pub fn fmt_dbvalues(av: &Vec<DBValue>) -> String {
+    av.iter().map(|x| format!("{} ", x)).collect::<String>()
+}
+
 pub type RelationID = String;
 
 pub type Bindings = HashMap<VariableName, ASTValue>;
@@ -332,13 +336,13 @@ pub fn unify_compare(op: &EqOp, a: &ASTValue, b: &ASTValue, bindings: Arc<Bindin
 
 pub fn fmt_ptr_bindings(b: &Bindings) -> String {
     let mut s = String::new();
-    s.push_str("{{ ");
+    s.push_str("{ ");
     let mut keyvals = b.iter().collect::<Vec<(_, _)>>();
     keyvals.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
     for (k, v) in keyvals {
         s.push_str(&format!("{} ~ {}, ", k, v));
     }
-    s.push_str("}}");
+    s.push_str("}");
     s
 }
 

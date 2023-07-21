@@ -1,8 +1,12 @@
+use core::fmt;
+
 use num_bigint::{BigInt, BigUint, Sign, ToBigInt};
+
+use crate::database::unification::fmt_dbvalues;
 
 use super::{
     backtracking::Constraint,
-    unification::{ASTValue, EqOp, GlobPosition},
+    unification::{fmt_values, ASTValue, EqOp, GlobPosition},
     DBValue,
 };
 
@@ -143,7 +147,7 @@ pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
             BigInt::from_radix_be(Sign::Minus, &vec![255], 256).unwrap(),
         )),
 
-        c if c.is_whitespace() => Ok(Token::NOP),
+        '\n' | '\t' | ' ' => Ok(Token::NOP),
         c if c.is_alphabetic() && c.is_uppercase() => Ok(Token::Variable(c.to_string())),
         c if c.is_alphabetic() && c.is_lowercase() => {
             Ok(Token::RelationID(c.to_uppercase().to_string()))
@@ -197,7 +201,7 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                 }
             }
             Some(Token::RelationID(ref mut s)) => {
-                if c.is_alphanumeric() {
+                if c.is_alphanumeric() || c == '_' {
                     s.push(c.to_uppercase().collect::<Vec<char>>()[0]);
                     false
                 } else {
@@ -500,11 +504,55 @@ pub enum MetaAST {
     Fact(Vec<DBValue>),
 }
 
+impl fmt::Display for MetaAST {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use MetaAST::*;
+        match self {
+            Constraint(c) => write!(f, "{}", c),
+            Rule(args, cs) => {
+                write!(
+                    f,
+                    "{} <{}> {}: \n",
+                    args[0],
+                    args[1],
+                    fmt_values(
+                        &args
+                            .into_iter()
+                            .skip(2)
+                            .map(|x| x.clone())
+                            .collect::<Vec<_>>()
+                    )
+                )?;
+                for c in cs {
+                    write!(f, "    {}", c)?;
+                }
+                Ok(())
+            }
+            Fact(dbvs) => {
+                write!(
+                    f,
+                    "+{} <{}> {}",
+                    dbvs[0],
+                    dbvs[1],
+                    fmt_dbvalues(
+                        &dbvs
+                            .into_iter()
+                            .skip(2)
+                            .map(|x| x.clone())
+                            .collect::<Vec<_>>()
+                    )
+                )
+            }
+        }
+    }
+}
+
 pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
     let mut statements = vec![];
     let mut statement = vec![];
     let tokens = tokenize_line(lines.to_string())?;
-    for tok in tokens {
+    let len = tokens.len() - 1;
+    for (i, tok) in tokens.into_iter().enumerate() {
         if tok == Token::StatementEnd {
             if statement.len() > 0 {
                 statements.push(statement);
@@ -512,6 +560,10 @@ pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
             }
         } else {
             statement.push(tok);
+            if i == len {
+                statements.push(statement);
+                statement = vec![];
+            }
         }
     }
 

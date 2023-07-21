@@ -1,9 +1,11 @@
 use std::env;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
+use std::time::Instant;
 use std::{collections::HashMap, sync::Arc};
 
 use database::{backtracking::BacktrackingQuery, parser::parse_fact, Database};
+use rayon::prelude::{ParallelBridge, ParallelIterator};
 
 use crate::database::parser::{parse_file, parse_line};
 
@@ -53,6 +55,7 @@ fn main() -> Result<(), String> {
         .build();
     let mut rl = rustyline::DefaultEditor::with_config(rl_config)
         .map_err(|_| "Could not start readline REPL!".to_string())?;
+    let mut prompt = true;
     if rl.load_history(".atomic_history").is_err() {
         println!("No previous history.");
     }
@@ -81,6 +84,7 @@ fn main() -> Result<(), String> {
     for statement in meta_ast {
         let query = Database::evaluate(db.clone(), bindings.clone(), statement)?;
         if let Some(query) = query {
+            prompt = false;
             explore_query(&mut rl, query, false);
         }
     }
@@ -97,7 +101,7 @@ fn main() -> Result<(), String> {
     );
     println!("{} rules loaded", db.rules.read().unwrap().len());
 
-    loop {
+    while prompt {
         let readline = rl.readline(&format!("{}>> {}", BLUE, NORMAL));
 
         match readline {
@@ -105,20 +109,7 @@ fn main() -> Result<(), String> {
                 let mut line = line.to_string();
                 if line.starts_with(".") {
                     line.remove(0);
-                    if line.starts_with("fact ") {
-                        line.drain(0..5);
-                        let parse = parse_fact(line.clone()).and_then(|fact| db.insert_fact(fact));
-                        if let Ok(_) = parse {
-                            let _ = writeln!(dbfacts, "{}", line)
-                                .map_err(|_| "Cannot save new fact to in memory fact file")?;
-                        } else {
-                            println!("{}Error: {}{}", RED_MESSAGE, parse.unwrap_err(), NORMAL);
-                        }
-                    } else if line == "save" {
-                        dbfacts
-                            .flush()
-                            .map_err(|_| "Cannot flush in memory fact file to disk")?;
-                    } else if line == "exit" {
+                    if line == "exit" {
                         println!("Bye!");
                         break;
                     } else if line == "help" {
@@ -126,10 +117,6 @@ fn main() -> Result<(), String> {
                             r"
 REPL commands:
 
-.{}fact{} <valid db fact> --- adds a new fact to the in-memory database
-.{}save{}                 --- saves a literal readout of the commands to
-                          build the in-memory database to disk, for
-                          loading at startup
 .{}exit{}                 --- exits the repl (CTRL-C and CTRL-D also work)
 .{}help{}                 --- this help message
 
@@ -147,14 +134,7 @@ comparison: <literal/variable> <operator> <literal/variable>
 group:      (<query>)
 operator: < > <= >= =
 ",
-                            GREEN_MESSAGE,
-                            NORMAL,
-                            GREEN_MESSAGE,
-                            NORMAL,
-                            GREEN_MESSAGE,
-                            NORMAL,
-                            GREEN_MESSAGE,
-                            NORMAL
+                            GREEN_MESSAGE, NORMAL, GREEN_MESSAGE, NORMAL,
                         )
                     } else {
                         println!("Unrecognized repl command.");
@@ -162,18 +142,18 @@ operator: < > <= >= =
                 } else {
                     rl.add_history_entry(line.clone())
                         .map_err(|_| "Cannot save history")?;
-                    let parse = parse_line(line);
-                    if let Ok(parse) = parse {
-                        let constraint = Arc::new(parse);
-
-                        println!("=>{}{}{}", GRAY_MESSAGE, constraint, NORMAL);
-
-                        let query =
-                            BacktrackingQuery::new(vec![constraint], db.clone(), bindings.clone());
-
-                        explore_query(&mut rl, query, true);
-                    } else {
-                        println!("{}Error: {}{}", RED_MESSAGE, NORMAL, parse.unwrap_err());
+                    let statements = parse_file(line);
+                    if let Ok(statements) = statements {
+                        for statement in statements {
+                            println!("=> {}{}{}", GRAY_MESSAGE, statement, NORMAL);
+                            let query =
+                                Database::evaluate(db.clone(), bindings.clone(), statement)?;
+                            if let Some(query) = query {
+                                explore_query(&mut rl, query, true);
+                            }
+                        }
+                    } else if let Err(err) = statements {
+                        println!("{}Error: {}{}", RED_MESSAGE, err, NORMAL);
                     }
                 }
             }
@@ -201,17 +181,19 @@ operator: < > <= >= =
 fn explore_query<'a>(
     rl: &mut rustyline::DefaultEditor,
     query: BacktrackingQuery<'a>,
-    confirm_continue: bool,
+    mut confirm_continue: bool,
 ) {
     let mut solutions = false;
     for (i, solution) in query.enumerate() {
         if confirm_continue && i != 0 {
             let confirm = rl
-                .readline("(press enter for next solution, n to stop)>> ")
+                .readline("(press enter -> next, n -> stop, or a -> all)>> ")
                 .map_err(|_| "Can't prompt with readline!")
                 .unwrap();
             if confirm.to_lowercase().contains("n") {
                 break;
+            } else if confirm.to_lowercase().contains("a") {
+                confirm_continue = false;
             } else {
                 print!("{}", "\x1b[s\x1b[1A\x1b[2K\x1b[u");
             }
@@ -222,12 +204,13 @@ fn explore_query<'a>(
         for (k, v) in solution.iter() {
             println!("    {} ~ {}", k, v);
         }
-        println!("");
-        println!("{}Ok.{}", GREEN_MESSAGE, NORMAL);
     }
     if !solutions {
         println!("");
         println!("{}No.{}", RED_MESSAGE, NORMAL);
+    } else {
+        println!("");
+        println!("{}Ok.{}", GREEN_MESSAGE, NORMAL);
     }
 }
 
