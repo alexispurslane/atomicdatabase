@@ -13,9 +13,29 @@ pub enum GlobPosition {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum MathExpression {
+    Value(Box<ASTValue>),
+    Unary(char, Box<MathExpression>),
+    Binary(char, Box<MathExpression>, Box<MathExpression>),
+}
+
+impl fmt::Display for MathExpression {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use MathExpression::*;
+
+        match self {
+            Value(v) => write!(f, "{}", v),
+            Unary(op, a) => write!(f, "{}{}", op, a),
+            Binary(op, a, b) => write!(f, "( {} {} {} )", a, op, b),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ASTValue {
     Literal(DBValue),
     Variable(VariableName),
+    Expression(Box<MathExpression>),
     PatternMatch {
         explicit_values: Vec<ASTValue>,
         is_glob: bool,
@@ -26,6 +46,9 @@ pub enum ASTValue {
 impl fmt::Display for ASTValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            ASTValue::Expression(me) => {
+                write!(f, "$( {} )", me)
+            }
             ASTValue::Literal(val) => write!(f, "{}", val),
             ASTValue::Variable(name) => write!(f, "{}", name),
             ASTValue::PatternMatch {
@@ -105,80 +128,136 @@ impl fmt::Display for EqOp {
     }
 }
 
+fn unify_variable_literal(
+    x: &String,
+    vy: &ASTValue,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> Result<Bindings, Bindings> {
+    let mut safe_current_bindings = current_bindings.clone();
+    safe_current_bindings.remove(x);
+    if let Some(vx) = current_bindings.get(x).or(environment.get(x)) {
+        let partials = unify_terms(vx, vy, environment, &safe_current_bindings);
+        if let (_, Ok(binds)) = partials {
+            let mut ret = HashMap::new();
+            for (k, v) in binds.into_iter() {
+                if !current_bindings.contains_key(&k) {
+                    ret.insert(k, v);
+                }
+            }
+            Ok(ret)
+        } else {
+            partials.1
+        }
+    } else {
+        Ok(HashMap::from([(x.clone(), vy.clone())]))
+    }
+}
+
+pub fn unify_variable_variable(
+    xvar: &ASTValue,
+    x: &String,
+    yvar: &ASTValue,
+    y: &String,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> (Hand, Result<Bindings, Bindings>) {
+    use ASTValue::*;
+    let x_val = current_bindings
+        .get(x)
+        .or(environment.get(x))
+        .unwrap_or(xvar);
+    let y_val = current_bindings
+        .get(y)
+        .or(environment.get(y))
+        .unwrap_or(yvar);
+
+    let mut safe_current_bindings = current_bindings.clone();
+    safe_current_bindings.remove(x);
+    safe_current_bindings.remove(y);
+    if x_val == xvar && y_val == yvar {
+        (
+            Hand::Left,
+            Ok(HashMap::from([(x.clone(), Variable(y.clone()))])),
+        )
+    } else {
+        let partials = unify_terms(x_val, y_val, environment, &safe_current_bindings);
+        if let (hand, Ok(binds)) = partials {
+            let mut ret = HashMap::new();
+            for (k, v) in binds {
+                if !current_bindings.contains_key(&k) {
+                    ret.insert(k, v);
+                }
+            }
+            (hand, Ok(ret))
+        } else {
+            return partials;
+        }
+    }
+}
+
+pub fn unify_pattern_literal(
+    explicit_values: &Vec<ASTValue>,
+    is_glob: &bool,
+    glob_position: &GlobPosition,
+    list: &Vec<DBValue>,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+    hand: Hand,
+) -> (Hand, Result<Bindings, Bindings>) {
+    let partials = unify_pattern_match(
+        list,
+        explicit_values,
+        is_glob,
+        glob_position,
+        current_bindings,
+    );
+    if let Ok(binds) = partials {
+        let mut ret = HashMap::new();
+        for (k, v) in binds {
+            if !current_bindings.contains_key(&k) {
+                ret.insert(k, v);
+            }
+        }
+        (hand, Ok(ret))
+    } else {
+        return (hand, partials);
+    }
+}
+
+// Need this so we can properly do scoping --- figure out which variable got
+// bound to which. Kill me, I fucking hate this
+pub enum Hand {
+    Left,
+    Right,
+    Unknown,
+}
+
 pub fn unify_terms(
     i: &ASTValue,
     j: &ASTValue,
     current_bindings: &Bindings,
     environment: &Bindings,
-) -> Result<Bindings, Bindings> {
+) -> (Hand, Result<Bindings, Bindings>) {
     use ASTValue::*;
     match (i, j) {
         (Literal(x), Literal(y)) => {
             if x != y {
-                Err(current_bindings.clone())
+                (Hand::Unknown, Err(HashMap::new()))
             } else {
-                Ok(HashMap::new())
+                (Hand::Unknown, Ok(HashMap::new()))
             }
         }
-        (Variable(x), vy @ Literal(_)) | (vy @ Literal(_), Variable(x)) => {
-            let mut safe_current_bindings = current_bindings.clone();
-            safe_current_bindings.remove(x);
-            if let Some(vx) = current_bindings.get(x).or(environment.get(x)) {
-                let partials = lax_unify(
-                    &vec![vx.clone()],
-                    &vec![vy.clone()],
-                    environment.clone(),
-                    &safe_current_bindings,
-                );
-                if let Ok(binds) = partials {
-                    let mut ret = HashMap::new();
-                    for (k, v) in binds.into_iter() {
-                        if !current_bindings.contains_key(&k) {
-                            ret.insert(k, v);
-                        }
-                    }
-                    Ok(ret)
-                } else {
-                    partials
-                }
-            } else {
-                Ok(HashMap::from([(x.clone(), vy.clone())]))
-            }
-        }
+        (Variable(x), vy @ Literal(_)) => (
+            Hand::Left,
+            unify_variable_literal(x, vy, current_bindings, environment),
+        ),
+        (vy @ Literal(_), Variable(x)) => (
+            Hand::Right,
+            unify_variable_literal(x, vy, current_bindings, environment),
+        ),
         (xvar @ Variable(x), yvar @ Variable(y)) => {
-            let x_val = current_bindings
-                .get(x)
-                .or(environment.get(x))
-                .unwrap_or(xvar);
-            let y_val = current_bindings
-                .get(y)
-                .or(environment.get(y))
-                .unwrap_or(yvar);
-
-            let mut safe_current_bindings = current_bindings.clone();
-            safe_current_bindings.remove(x);
-            safe_current_bindings.remove(y);
-            if x_val == xvar && y_val == yvar {
-                Ok(HashMap::from([(x.clone(), Variable(y.clone()))]))
-            } else {
-                let partials = lax_unify(
-                    &vec![x_val.clone()],
-                    &vec![y_val.clone()],
-                    environment.clone(),
-                    &safe_current_bindings,
-                );
-                if let Ok(binds) = partials {
-                    let mut ret = HashMap::new();
-                    for (k, v) in binds {
-                        if !current_bindings.contains_key(&k) {
-                            ret.insert(k, v);
-                        }
-                    }
-                    Ok(ret)
-                } else {
-                    return partials;
-                }
-            }
+            unify_variable_variable(xvar, x, yvar, y, current_bindings, environment)
         }
         (
             Literal(DBValue::List(list)),
@@ -187,35 +266,32 @@ pub fn unify_terms(
                 is_glob,
                 glob_position,
             },
-        )
-        | (
+        ) => unify_pattern_literal(
+            explicit_values,
+            is_glob,
+            glob_position,
+            list,
+            current_bindings,
+            environment,
+            Hand::Right,
+        ),
+        (
             PatternMatch {
                 explicit_values,
                 is_glob,
                 glob_position,
             },
             Literal(DBValue::List(list)),
-        ) => {
-            let partials = unify_pattern_match(
-                list,
-                explicit_values,
-                is_glob,
-                glob_position,
-                current_bindings,
-            );
-            if let Ok(binds) = partials {
-                let mut ret = HashMap::new();
-                for (k, v) in binds {
-                    if !current_bindings.contains_key(&k) {
-                        ret.insert(k, v);
-                    }
-                }
-                Ok(ret)
-            } else {
-                return partials;
-            }
-        }
-        _ => Err(current_bindings.clone()),
+        ) => unify_pattern_literal(
+            explicit_values,
+            is_glob,
+            glob_position,
+            list,
+            current_bindings,
+            environment,
+            Hand::Left,
+        ),
+        _ => (Hand::Unknown, Err(HashMap::new())),
     }
 }
 
@@ -226,7 +302,7 @@ pub fn lax_unify(
     bindings: &Bindings,
 ) -> Result<Bindings, Bindings> {
     for (i, j) in av.iter().zip(bv) {
-        current_bindings.extend(unify_terms(i, j, &current_bindings, &bindings.clone())?);
+        current_bindings.extend(unify_terms(i, j, &current_bindings, &bindings.clone()).1?);
     }
     Ok(current_bindings)
 }
@@ -346,26 +422,35 @@ pub fn fmt_ptr_bindings(b: &Bindings) -> String {
     s
 }
 
-pub fn unify_get_variable_value(
-    varname: &String,
-    current_bindings: &Bindings,
-    environment: &Bindings,
-) -> Option<ASTValue> {
-    let get_name = format!(
-        "GETVALUE#{}",
+pub fn gen_clean_name(varname: &String) -> String {
+    format!(
+        "{}#{}",
+        varname,
         rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(3)
             .map(char::from)
             .collect::<String>(),
-    );
-    let lvalue = vec![ASTValue::Variable(get_name.clone())];
-    let rvalue = vec![ASTValue::Variable(varname.clone())];
-    lax_unify(&lvalue, &rvalue, current_bindings.clone(), &environment)
-        .ok()
-        .expect(&format!("Cannot unify {} with a variable?!", rvalue[0]))
-        .get(&get_name)
-        .map(|x| x.clone())
+    )
+}
+
+pub fn unify_get_variable_value(
+    varname: &String,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> Option<ASTValue> {
+    let get_name = gen_clean_name(varname);
+    unify_terms(
+        &ASTValue::Variable(get_name.clone()),
+        &ASTValue::Variable(varname.clone()),
+        current_bindings,
+        environment,
+    )
+    .1
+    .ok()
+    .expect(&format!("Cannot unify unique ID with a variable?!"))
+    .get(&get_name)
+    .map(|x| x.clone())
 }
 
 pub fn fmt_arc_bindings(b: Arc<Bindings>) -> String {

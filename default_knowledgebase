@@ -103,9 +103,9 @@ X partners with Y:
 X cousins with Y:
     T parent of X,
     U parent of Y,
+    !X = Y, !T = U,
     U siblings with T.
 
 % -------------- Queries -------------- %
 
-X foo less_than_two: X < 2 .
-X foo less_than_five: X < 5 .
+X cousins with Y.

@@ -6,9 +6,18 @@ use crate::database::unification::fmt_dbvalues;
 
 use super::{
     backtracking::Constraint,
-    unification::{fmt_values, ASTValue, EqOp, GlobPosition},
+    unification::{fmt_values, ASTValue, EqOp, GlobPosition, MathExpression},
     DBValue,
 };
+
+macro_rules! precidence_table {
+    ($tokens: expr, $( $p:pat ),+) => {
+        vec![$( $tokens.position(|x| match x {
+            $p => true,
+            _ => false
+        }) ),+].iter().fold(None, |x, y| x.or(*y))
+    };
+}
 
 pub type VariableName = String;
 
@@ -32,6 +41,7 @@ pub enum Token {
     NotOp,
     AltOp,
     IntOp,
+    MathOp(char),
     // lexing control ops (internal)
     IntermediateList(String),
     IntermediateGroup(String),
@@ -104,13 +114,13 @@ impl ToDBValue for usize {
 
 impl ToDBValue for f64 {
     fn to_dbvalue(self) -> Result<DBValue, Token> {
-        let tokens = tokenize_line(format!("{}", self)).ok().ok_or(Token::NOP)?;
+        let tokens = tokenize_line(&format!("{}", self)).ok().ok_or(Token::NOP)?;
         let float = tokens.get(0).ok_or(Token::NOP)?;
         (float.clone()).to_dbvalue()
     }
 }
 
-pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
+pub fn char_starts_token(i: usize, c: char, prev_token_count: usize) -> Result<Token, String> {
     match c {
         '\"' | '\'' => Ok(Token::Text(String::new())),
         '.' => Ok(Token::StatementEnd),
@@ -146,8 +156,8 @@ pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
         '-' => Ok(Token::Number(
             BigInt::from_radix_be(Sign::Minus, &vec![255], 256).unwrap(),
         )),
-
         '\n' | '\t' | ' ' => Ok(Token::NOP),
+        c if is_binary_op(c) => Ok(Token::MathOp(c)),
         c if c.is_alphabetic() && c.is_uppercase() => Ok(Token::Variable(c.to_string())),
         c if c.is_alphabetic() && c.is_lowercase() => {
             Ok(Token::RelationID(c.to_uppercase().to_string()))
@@ -160,14 +170,18 @@ pub fn char_starts_token(i: usize, c: char) -> Result<Token, String> {
     }
 }
 
-pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
-    let mut tokens = vec![];
+fn is_binary_op(c: char) -> bool {
+    c == '+' || c == '-' || c == '*' || c == '/' || c == '&' || c == '|' || c == ':'
+}
+
+pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
+    let mut tokens: Vec<Token> = vec![];
     let mut current_token = None;
     let mut in_decimal = false;
     let mut list_depth = 0;
     let mut paren_depth = 0;
 
-    for (i, c) in (line + " ").chars().enumerate() {
+    for (i, c) in line.chars().enumerate() {
         if c == '[' {
             list_depth += 1;
         }
@@ -179,7 +193,7 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                 if c == '.' {
                     in_decimal = true;
                 }
-                current_token = Some(char_starts_token(i, c)?);
+                current_token = Some(char_starts_token(i, c, tokens.len())?);
                 false
             }
             Some(Token::Comment) => {
@@ -236,14 +250,16 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
             }
             Some(Token::IntermediateGroup(ref mut s)) => {
                 if c == ')' {
-                    paren_depth -= 1;
-                    if paren_depth == 0 {
-                        tokens.push(Token::Group(tokenize_line(s.to_string())?));
-                        current_token = None;
-                    } else {
-                        s.push(c);
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                        if paren_depth == 0 {
+                            tokens.push(Token::Group(tokenize_line(s)?));
+                            current_token = None;
+                        } else {
+                            s.push(c);
+                        }
                     }
-                    false
+                    return Err(format!("Unexpected closing parenthesis as column {}", i));
                 } else {
                     s.push(c);
                     false
@@ -253,9 +269,7 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                 if c == ']' {
                     list_depth -= 1;
                     if list_depth == 0 {
-                        tokens.push(Token::List(tokens_to_dbvalues(tokenize_line(
-                            s.to_string(),
-                        )?)?));
+                        tokens.push(Token::List(tokens_to_dbvalues(tokenize_line(s)?)?));
                         current_token = None;
                     } else {
                         s.push(c);
@@ -313,18 +327,20 @@ pub fn tokenize_line(line: String) -> Result<Vec<Token>, String> {
                     true
                 }
             }
-            Some(Token::NOP) => {
-                current_token = char_starts_token(i, c).ok();
-                false
-            }
+            Some(Token::NOP) => true,
             _ => true,
         };
         if token_end {
-            tokens.push(current_token.unwrap());
-            current_token = char_starts_token(i, c).ok();
+            if current_token != Some(Token::NOP) {
+                tokens.push(current_token.unwrap());
+            }
+            current_token = Some(char_starts_token(i, c, tokens.len())?);
         }
     }
-    Ok(tokens.into_iter().filter(|x| *x != Token::NOP).collect())
+    if current_token.is_some() && current_token != Some(Token::NOP) {
+        tokens.push(current_token.unwrap());
+    }
+    Ok(tokens.into_iter().collect())
 }
 
 pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
@@ -355,20 +371,11 @@ pub fn tokens_to_dbvalues(tokens: Vec<Token>) -> Result<Vec<DBValue>, String> {
     Ok(dbvalues)
 }
 
-macro_rules! precidence_table {
-    ($tokens: ident, $( $p:pat ),+) => {
-        vec![$( $tokens.iter().position(|x| match x {
-            $p => true,
-            _ => false
-        }) ),+].iter().fold(None, |x, y| x.or(*y))
-    };
-}
-
 pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
     // split at lowest precidence operators first
 
     if let Some((left, right)) = precidence_table!(
-        tokens,
+        tokens.iter(),
         Token::AltOp,
         Token::IntOp,
         Token::UnifyOp,
@@ -489,12 +496,12 @@ pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
 }
 
 pub fn parse_line(line: String) -> Result<Constraint, String> {
-    let tokens = tokenize_line(line)?;
+    let tokens = tokenize_line(&line)?;
     tokens_to_constraint(tokens)
 }
 
 pub fn parse_fact(line: String) -> Result<Vec<DBValue>, String> {
-    let tokens = tokenize_line(line)?;
+    let tokens = tokenize_line(&line)?;
     tokens_to_dbvalues(tokens)
 }
 
@@ -550,7 +557,7 @@ impl fmt::Display for MetaAST {
 pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
     let mut statements = vec![];
     let mut statement = vec![];
-    let tokens = tokenize_line(lines.to_string())?;
+    let tokens = tokenize_line(&lines)?;
     let len = tokens.len() - 1;
     for (i, tok) in tokens.into_iter().enumerate() {
         if tok == Token::StatementEnd {

@@ -8,53 +8,6 @@ use super::{
 
 pub type VariableName = String;
 
-pub fn char_starts_token(i: usize, c: char, sign: Sign) -> Value {
-    if c.is_alphabetic() && c.is_uppercase() {
-        Value::Variable(c.to_string())
-    } else if c.is_alphabetic() && c.is_lowercase() {
-        Value::Literal(DBValue::RelationID(c.to_string()))
-    } else if c == '\"' || c == '\'' {
-        Value::Literal(DBValue::Text(c.to_string()))
-    } else if c.is_numeric() {
-        Value::Literal(DBValue::Number(BigInt::new(sign, vec![c.to_digit(10)])))
-    } else if c == '.' {
-        Value::Literal(DBValue::Float(0, 0))
-    } else if c == '[' {
-        Value::Literal(DBValue::List(vec![]))
-    } else if c == '{' {
-        Value::PatternMatch {
-            explicit_values: vec![],
-            is_glob: false,
-            glob_position: super::unification::GlobPosition::Middle,
-        }
-    } else {
-        panic!("Unknown char `{}` at column `{}`", c, i);
-    }
-}
-
-pub fn parse_line(line: String) -> Vec<Value> {
-    let mut tokens = vec![];
-    let mut current_token = None;
-    let mut list_tokens = vec![];
-    let mut digits = vec![];
-    let mut sign = Sign::NoSign;
-
-    for (i, c) in line.chars().enumerate() {
-        match current_token {
-            None => {
-                current_token = Some(char_starts_token(i, c, sign));
-            }
-            Some(Value::Variable(s)) => {
-                if c.is_alphanumeric() {
-                    s.push(c);
-                } else if c.is_whitespace() || c == ',' || c == '[' || c == '{' {
-                }
-            }
-        }
-    }
-    tokens
-}
-
 pub fn parse_query(tokens: Vec<String>) -> Result<Constraint, String> {
     if let Some(alt_split_point) = tokens.iter().position(|tok| *tok == "|") {
         let (tokens_left, tokens_right) = tokens.split_at(alt_split_point);

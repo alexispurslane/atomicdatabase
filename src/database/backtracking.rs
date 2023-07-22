@@ -133,24 +133,22 @@ impl Iterator for BacktrackingQuery<'_> {
     fn next(&mut self) -> Option<Arc<Bindings>> {
         loop {
             let current_constraint_index = self.constraint_stack.len();
-            println!("constraint stack length: {}", current_constraint_index);
             // Satisfy all the constraints
             if let Some(new_constraint) = self.constraints.get(current_constraint_index) {
                 let last_binding = self
                     .constraint_stack
                     .last_mut()
                     .map_or(Some(Ok(self.bindings.clone())), |x| x.next());
-                println!("Called last_binding next()");
                 if let Some(last_binding) = last_binding {
                     if let Ok(environment) = last_binding {
-                        println!(
-                            " {}>: {} {}",
-                            (0..(self.constraint_stack.len() + self.depth))
-                                .map(|_| '-')
-                                .collect::<String>(),
-                            new_constraint,
-                            fmt_arc_bindings(environment.clone())
-                        );
+                        // println!(
+                        //     " {}>: {} {}",
+                        //     (0..(self.constraint_stack.len() + self.depth))
+                        //         .map(|_| '-')
+                        //         .collect::<String>(),
+                        //     new_constraint,
+                        //     fmt_arc_bindings(environment.clone())
+                        // );
                         // possible bindings for this next branch given the next possible binding for the previous branch
                         let new_possible_bindings = PossibleBindings::new(
                             new_constraint.clone(),
@@ -166,13 +164,6 @@ impl Iterator for BacktrackingQuery<'_> {
                 } else {
                     // This branch is exhausted, go up!
                     self.constraint_stack.pop();
-                    println!(
-                        "{}<- {}",
-                        (0..(self.constraint_stack.len() + self.depth - 1))
-                            .map(|_| ' ')
-                            .collect::<String>(),
-                        new_constraint
-                    );
                     if self.constraint_stack.is_empty() {
                         // We've exhausted even the first constraint, so we're done here
                         return None;
@@ -184,7 +175,6 @@ impl Iterator for BacktrackingQuery<'_> {
                 // branch! If we've run out of possible values, go up a branch
                 // and try more possible values there to produce more here
                 if let Some(lbs) = self.constraint_stack.last_mut() {
-                    println!("Called final binding next()");
                     if let Some(binding) = lbs.next() {
                         if let Ok(binding) = binding {
                             return Some(binding);
@@ -327,17 +317,7 @@ impl<'b> PossibleBindings<'b> {
         >,
     ) -> Option<&'a (Vec<ASTValue>, Vec<Arc<Constraint>>)> {
         if let Constraint::Relation(id, _) = self.constraint.as_ref() {
-            db_rules.get(id).and_then(|x| {
-                let res = x.get(self.rules_index);
-                if let Some(res) = res {
-                    print!("Rule {}: ", self.rules_index);
-                    for c in res.1.iter() {
-                        print!("{}, ", c);
-                    }
-                    println!(".");
-                }
-                res
-            })
+            db_rules.get(id).and_then(|x| x.get(self.rules_index))
         } else {
             None
         }
@@ -470,10 +450,10 @@ pub fn split_arguments(
     for (otok, itok) in outer_tokens.iter().zip(inner_tokens) {
         match (otok, itok) {
             (Variable(_), Literal(_)) => {
-                outer_bindings.extend(unify_terms(&otok, &itok, &outer_bindings, &environment)?);
+                outer_bindings.extend(unify_terms(&otok, &itok, &outer_bindings, &environment).1?);
             }
             (Literal(_), Variable(_)) => {
-                inner_bindings.extend(unify_terms(&itok, &otok, &inner_bindings, &environment)?);
+                inner_bindings.extend(unify_terms(&itok, &otok, &inner_bindings, &environment).1?);
             }
             (outer_var @ Variable(outer_name), inner_var @ Variable(inner_name)) => {
                 let throwaway = HashMap::new();
@@ -481,32 +461,32 @@ pub fn split_arguments(
                     .unwrap_or(outer_var.clone());
                 let inner_val = unify_get_variable_value(inner_name, &inner_bindings, &throwaway)
                     .unwrap_or(inner_var.clone());
-                let binds = unify_terms(&outer_val, &inner_val, &throwaway, &throwaway)?;
-                if let Some(val) = binds.get(outer_name) {
-                    // By default, if both are unbound, outer will get bound to
-                    // inner, because outer is the output variable that needs to
-                    // take on inner's value. Thus, we put it in the output
-                    // variables category:
-                    outer_bindings.insert(outer_name.clone(), val.clone());
-                } else if let Some(val) = binds.get(inner_name) {
-                    // Here, the outer variable was set to something and so
-                    // enforced its will on the ultimately unbound inner
-                    // variable. This should go in the inner scope
-                    inner_bindings.insert(inner_name.clone(), val.clone());
-                } else {
-                    // then they turned out both to be set, need do nothing here.
+                let (hand, binds) = unify_terms(&outer_val, &inner_val, &throwaway, &throwaway);
+                let binds = binds?;
+                match hand {
+                    Hand::Left => {
+                        if let Some(outer_bind) = binds.get(outer_name) {
+                            outer_bindings.insert(outer_name.clone(), outer_bind.clone());
+                        }
+                    }
+                    Hand::Right => {
+                        if let Some(inner_bind) = binds.get(inner_name) {
+                            inner_bindings.insert(inner_name.clone(), inner_bind.clone());
+                        }
+                    }
+                    _ => panic!("Got unknown hand for {} ~ {}", otok, itok),
                 }
             }
             _ => {
-                unify_terms(&otok, &itok, &outer_bindings, &environment)?;
+                unify_terms(&otok, &itok, &outer_bindings, &environment).1?;
             }
         }
     }
-    println!(
-        "{} {}",
-        fmt_ptr_bindings(&outer_bindings),
-        fmt_ptr_bindings(&inner_bindings)
-    );
+    // println!(
+    //     "{} {}",
+    //     fmt_ptr_bindings(&outer_bindings),
+    //     fmt_ptr_bindings(&inner_bindings)
+    // );
     Ok((outer_bindings, inner_bindings))
 }
 
