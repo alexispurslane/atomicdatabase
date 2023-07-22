@@ -183,6 +183,7 @@ fn explore_query<'a>(
     query: BacktrackingQuery<'a>,
     mut confirm_continue: bool,
 ) {
+    let mut now = Instant::now();
     let mut solutions = false;
     for (i, solution) in query.enumerate() {
         if confirm_continue && i != 0 {
@@ -193,6 +194,7 @@ fn explore_query<'a>(
             if confirm.to_lowercase().contains("n") {
                 break;
             } else if confirm.to_lowercase().contains("a") {
+                now = Instant::now();
                 confirm_continue = false;
             } else {
                 print!("{}", "\x1b[s\x1b[1A\x1b[2K\x1b[u");
@@ -205,12 +207,13 @@ fn explore_query<'a>(
             println!("    {} ~ {}", k, v);
         }
     }
+    let elapsed = now.elapsed();
     if !solutions {
         println!("");
         println!("{}No.{}", RED_MESSAGE, NORMAL);
     } else {
         println!("");
-        println!("{}Ok.{}", GREEN_MESSAGE, NORMAL);
+        println!("({:?} elapsed) {}Ok.{}", elapsed, GREEN_MESSAGE, NORMAL);
     }
 }
 

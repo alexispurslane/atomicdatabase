@@ -136,14 +136,12 @@ fn unify_variable_literal(
 ) -> Result<Bindings, Bindings> {
     let mut safe_current_bindings = current_bindings.clone();
     safe_current_bindings.remove(x);
-    if let Some(vx) = current_bindings.get(x).or(environment.get(x)) {
+    if let Some(vx) = current_bindings.get(x) {
         let partials = unify_terms(vx, vy, environment, &safe_current_bindings);
         if let (_, Ok(binds)) = partials {
             let mut ret = HashMap::new();
             for (k, v) in binds.into_iter() {
-                if !current_bindings.contains_key(&k) {
-                    ret.insert(k, v);
-                }
+                ret.insert(k, v);
             }
             Ok(ret)
         } else {
