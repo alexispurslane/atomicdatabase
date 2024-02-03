@@ -1,6 +1,7 @@
 use core::fmt;
 use std::{collections::HashMap, sync::Arc};
 
+use num_bigint::ToBigInt;
 use rand::{distributions::Alphanumeric, Rng};
 
 use super::{parser::VariableName, DBValue};
@@ -26,7 +27,17 @@ impl fmt::Display for MathExpression {
         match self {
             Value(v) => write!(f, "{}", v),
             Unary(op, a) => write!(f, "{}{}", op, a),
-            Binary(op, a, b) => write!(f, "( {} {} {} )", a, op, b),
+            Binary(op, a, b) => write!(
+                f,
+                "( {} {} {} )",
+                a,
+                if *op == ':' {
+                    "::".to_string()
+                } else {
+                    format!("{}", op)
+                },
+                b
+            ),
         }
     }
 }
@@ -223,8 +234,84 @@ pub fn unify_pattern_literal(
     }
 }
 
-// Need this so we can properly do scoping --- figure out which variable got
-// bound to which. Kill me, I fucking hate this
+macro_rules! binary_op {
+    ($op:expr, $($val:pat => $block:expr),+) => {{
+        let a = evaluate_math(a, current_bindings, environment)?;
+        let b = evaluate_math(b, current_bindings, environment)?;
+        match (a, b) {
+            $($val => $block),+
+            (ASTValue::Expression(e1), ASTValue::Expression(e2)) => Ok(ASTValue::Expression(
+                Box::new(MathExpression::Binary(op, e1, e2)),
+            )),
+            (ASTValue::Expression(e1), v1 @ ASTValue::Variable(_)) =>
+                Ok(ASTValue::Expression(
+                    Box::new(MathExpression::Binary(op, e1, Box::new(MathExpression::Value(Box::new(v1))))),
+                )),
+            (v1 @ ASTValue::Variable(_), ASTValue::Expression(e1)) =>
+                Ok(ASTValue::Expression(
+                    Box::new(MathExpression::Binary(op, Box::new(MathExpression::Value(Box::new(v1))), e1)),
+                )),
+            (v1 @ ASTValue::Variable(_), v2 @ ASTValue::Variable(_)) => Ok(ASTValue::Expression(Box::new(
+                MathExpression::Binary(
+                    op,
+                    Box::new(MathExpression::Value(Box::new(v1))),
+                    Box::new(MathExpression::Value(Box::new(v2)))
+                ),
+            ))),
+            (_, _) => Err(format!("No sensible way to apply binary `{}` to {} and {}", op, a, b))
+        }
+    }};
+}
+
+pub fn evaluate_math(
+    e: &MathExpression,
+    current_bindings: &Bindings,
+    environment: &Bindings,
+) -> Result<ASTValue, String> {
+    match e {
+        MathExpression::Value(v) => Ok((**v).clone()),
+        MathExpression::Unary('+', e) => match evaluate_math(e, current_bindings, environment) {
+            Ok(ASTValue::Literal(DBValue::Number(n))) => Ok(ASTValue::Literal(DBValue::Number(
+                n.magnitude().to_bigint().unwrap(),
+            ))),
+            Ok(ASTValue::Literal(DBValue::Float(a, b))) => Ok(ASTValue::Literal(DBValue::Float(
+                a.magnitude().to_bigint().unwrap(),
+                b,
+            ))),
+            Ok(ASTValue::Expression(e)) => Ok(ASTValue::Expression(Box::new(
+                MathExpression::Unary('+', e),
+            ))),
+            Ok(v @ ASTValue::Variable(_)) => Ok(ASTValue::Expression(Box::new(
+                MathExpression::Unary('+', Box::new(MathExpression::Value(Box::new(v)))),
+            ))),
+            Ok(val) => Err(format!("No sensible way to apply unary `+` to {}", val)),
+            Err(e) => Err(e),
+        },
+        MathExpression::Unary('-', e) => match evaluate_math(e, current_bindings, environment) {
+            Ok(ASTValue::Literal(DBValue::Number(n))) => Ok(ASTValue::Literal(DBValue::Number(-n))),
+            Ok(ASTValue::Literal(DBValue::Float(a, b))) => {
+                Ok(ASTValue::Literal(DBValue::Float(-a, b)))
+            }
+            Ok(ASTValue::Expression(e)) => Ok(ASTValue::Expression(Box::new(
+                MathExpression::Unary('+', e),
+            ))),
+            Ok(v @ ASTValue::Variable(_)) => Ok(ASTValue::Expression(Box::new(
+                MathExpression::Unary('+', Box::new(MathExpression::Value(Box::new(v)))),
+            ))),
+            Ok(val) => Err(format!("No sensible way to apply unary `+` to {}", val)),
+            Err(e) => Err(e),
+        },
+        MathExpression::Unary(op, _) => Err(format!(
+            "No sensible way to apply unary `{}` to anything",
+            op
+        )),
+        MathExpression::Binary('+', a, b) => binary_op!('+',
+            (ASTValue::Literal(DBValue::Number(a)), ASTValue::Literal(DBValue::Number(b))) => a + b,
+            (ASTValue::Literal(DBValue::Number(a)), ASTValue::Literal(DBValue::Float(b))) | (ASTValue::Literal(DBValue::Number(a)), ASTValue::Literal(DBValue::Float(b))) => a + b,
+        ),
+    }
+}
+
 pub enum Hand {
     Left,
     Right,
@@ -289,7 +376,68 @@ pub fn unify_terms(
             environment,
             Hand::Left,
         ),
-        _ => (Hand::Unknown, Err(HashMap::new())),
+        (Expression(a), Expression(b)) => {
+            let a = evaluate_math(a, &current_bindings, &environment);
+            let b = evaluate_math(b, &current_bindings, &environment);
+            if a.is_ok() && b.is_ok() && a == b {
+                (Hand::Unknown, Ok(HashMap::new()))
+            } else {
+                (Hand::Unknown, Err(HashMap::new()))
+            }
+        }
+        (Variable(x), Expression(e)) => {
+            let eval = evaluate_math(e, &current_bindings, &environment);
+            if let Ok(res) = eval {
+                (
+                    Hand::Left,
+                    unify_variable_literal(x, &res, current_bindings, environment),
+                )
+            } else {
+                (
+                    Hand::Unknown,
+                    Err(HashMap::from([(
+                        gen_clean_name(&"Error".to_string()),
+                        ASTValue::Literal(DBValue::Text(eval.unwrap_err())),
+                    )])),
+                )
+            }
+        }
+        (Expression(e), Variable(x)) => {
+            let eval = evaluate_math(e, &current_bindings, &environment);
+            if let Ok(res) = eval {
+                (
+                    Hand::Right,
+                    unify_variable_literal(x, &res, current_bindings, environment),
+                )
+            } else {
+                (
+                    Hand::Unknown,
+                    Err(HashMap::from([(
+                        gen_clean_name(&"Error".to_string()),
+                        ASTValue::Literal(DBValue::Text(eval.unwrap_err())),
+                    )])),
+                )
+            }
+        }
+        (Expression(e), v @ Literal(_)) | (v @ Literal(_), Expression(e)) => {
+            let eval = evaluate_math(e, &current_bindings, &environment);
+            if let Ok(res) = eval {
+                if res == *v {
+                    (Hand::Unknown, Ok(HashMap::new()))
+                } else {
+                    (Hand::Unknown, Err(HashMap::new()))
+                }
+            } else {
+                (
+                    Hand::Unknown,
+                    Err(HashMap::from([(
+                        gen_clean_name(&"Error".to_string()),
+                        ASTValue::Literal(DBValue::Text(eval.unwrap_err())),
+                    )])),
+                )
+            }
+        }
+        _ => unimplemented!(),
     }
 }
 

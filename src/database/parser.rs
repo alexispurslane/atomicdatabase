@@ -26,15 +26,16 @@ pub enum Token {
     Text(String),
     Number(BigInt),
     Float(BigInt, BigUint),
-    RelationID(String),
     List(Vec<DBValue>),
     Group(Vec<Token>),
+    Expression(MathExpression),
     Variable(VariableName),
     PatternMatch {
         explicit_values: Vec<ASTValue>,
         is_glob: bool,
         glob_position: GlobPosition,
     },
+    RelationID(String),
     RuleOp,
     UnifyOp,
     EqOp(EqOp),
@@ -45,6 +46,7 @@ pub enum Token {
     // lexing control ops (internal)
     IntermediateList(String),
     IntermediateGroup(String),
+    IntermediateMathGroup(String),
     NOP,
     StatementEnd,
     Comment,
@@ -69,6 +71,7 @@ impl ToASTValue for Token {
                 is_glob,
                 glob_position,
             }),
+            Err(Expression(me)) => Ok(ASTValue::Expression(Box::new(me))),
             Err(tok) => Err(tok),
         }
     }
@@ -114,13 +117,15 @@ impl ToDBValue for usize {
 
 impl ToDBValue for f64 {
     fn to_dbvalue(self) -> Result<DBValue, Token> {
-        let tokens = tokenize_line(&format!("{}", self)).ok().ok_or(Token::NOP)?;
+        let tokens = tokenize_line(&format!("{}", self), false)
+            .ok()
+            .ok_or(Token::NOP)?;
         let float = tokens.get(0).ok_or(Token::NOP)?;
         (float.clone()).to_dbvalue()
     }
 }
 
-pub fn char_starts_token(i: usize, c: char, prev_token_count: usize) -> Result<Token, String> {
+pub fn char_starts_token(i: usize, c: char, in_math_expr: bool) -> Result<Token, String> {
     match c {
         '\"' | '\'' => Ok(Token::Text(String::new())),
         '.' => Ok(Token::StatementEnd),
@@ -156,8 +161,9 @@ pub fn char_starts_token(i: usize, c: char, prev_token_count: usize) -> Result<T
         '-' => Ok(Token::Number(
             BigInt::from_radix_be(Sign::Minus, &vec![255], 256).unwrap(),
         )),
+        '$' if !in_math_expr => Ok(Token::IntermediateMathGroup(String::new())),
         '\n' | '\t' | ' ' => Ok(Token::NOP),
-        c if is_binary_op(c) => Ok(Token::MathOp(c)),
+        c if is_math_op(c) && in_math_expr => Ok(Token::MathOp(c)),
         c if c.is_alphabetic() && c.is_uppercase() => Ok(Token::Variable(c.to_string())),
         c if c.is_alphabetic() && c.is_lowercase() => {
             Ok(Token::RelationID(c.to_uppercase().to_string()))
@@ -170,18 +176,19 @@ pub fn char_starts_token(i: usize, c: char, prev_token_count: usize) -> Result<T
     }
 }
 
-fn is_binary_op(c: char) -> bool {
-    c == '+' || c == '-' || c == '*' || c == '/' || c == '&' || c == '|' || c == ':'
+fn is_math_op(c: char) -> bool {
+    c == '+' || c == '-' || c == '*' || c == '/' || c == '&' || c == '|' || c == ':' || c == '^'
 }
 
-pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
+pub fn tokenize_line(line: &String, in_math_expr: bool) -> Result<Vec<Token>, String> {
     let mut tokens: Vec<Token> = vec![];
     let mut current_token = None;
     let mut in_decimal = false;
     let mut list_depth = 0;
     let mut paren_depth = 0;
 
-    for (i, c) in line.chars().enumerate() {
+    let chars = line.chars();
+    for (i, c) in chars.enumerate() {
         if c == '[' {
             list_depth += 1;
         }
@@ -193,8 +200,16 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
                 if c == '.' {
                     in_decimal = true;
                 }
-                current_token = Some(char_starts_token(i, c, tokens.len())?);
+                current_token = Some(char_starts_token(i, c, in_math_expr)?);
                 false
+            }
+            Some(Token::RuleOp) => {
+                if c == ':' {
+                    current_token = Some(Token::MathOp(c));
+                    false
+                } else {
+                    true
+                }
             }
             Some(Token::Comment) => {
                 if c == '%' || c == '\n' {
@@ -222,12 +237,35 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
                     true
                 }
             }
+            Some(Token::IntermediateMathGroup(ref mut s)) => {
+                if paren_depth > 0 {
+                    if c == ')' {
+                        paren_depth -= 1;
+                        if paren_depth == 0 {
+                            tokens.push(Token::Expression(tokens_to_math_expression(
+                                &tokenize_line(s, true)?,
+                            )?));
+                            current_token = None;
+                        } else {
+                            s.push(c);
+                        }
+                    } else if !(c == '(' && paren_depth == 1) {
+                        s.push(c);
+                    }
+                    false
+                } else {
+                    return Err(format!(
+                        "Unexpected character '{}' after math expression.",
+                        c
+                    ));
+                }
+            }
             Some(Token::Number(ref mut n)) => {
+                // get sign and digits at test-radix, so we can see our test
+                // value
+                let (sign, mut prevdigits) = n.to_radix_be(256);
                 if c.is_numeric() {
                     let digit = c.to_digit(10).unwrap() as u8;
-                    // get sign and digits at test-radix, so we can see our test
-                    // value
-                    let (sign, mut prevdigits) = n.to_radix_be(256);
                     // test value is here, we don't need the previous digits and
                     // can start over with this digit
                     if prevdigits[0] == 255 {
@@ -244,6 +282,18 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
                     in_decimal = true;
                     current_token = Some(Token::Float(n.clone(), BigUint::new(vec![])));
                     false
+                } else if (c == ' ' || c == ',' || c == '\n')
+                    && prevdigits[0] == 255
+                    && in_math_expr
+                {
+                    current_token = Some(Token::MathOp(if sign == Sign::Minus {
+                        '-'
+                    } else if sign == Sign::Plus {
+                        '+'
+                    } else {
+                        unreachable!()
+                    }));
+                    false
                 } else {
                     true
                 }
@@ -253,13 +303,18 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
                     if paren_depth > 0 {
                         paren_depth -= 1;
                         if paren_depth == 0 {
-                            tokens.push(Token::Group(tokenize_line(s)?));
+                            tokens.push(Token::Group(tokenize_line(s, in_math_expr)?));
                             current_token = None;
                         } else {
                             s.push(c);
                         }
+                        false
+                    } else {
+                        return Err(format!(
+                            "Unexpected closing parenthesis as column {} for expression `{}`",
+                            i, s
+                        ));
                     }
-                    return Err(format!("Unexpected closing parenthesis as column {}", i));
                 } else {
                     s.push(c);
                     false
@@ -269,7 +324,7 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
                 if c == ']' {
                     list_depth -= 1;
                     if list_depth == 0 {
-                        tokens.push(Token::List(tokens_to_dbvalues(tokenize_line(s)?)?));
+                        tokens.push(Token::List(tokens_to_dbvalues(tokenize_line(s, false)?)?));
                         current_token = None;
                     } else {
                         s.push(c);
@@ -334,7 +389,7 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
             if current_token != Some(Token::NOP) {
                 tokens.push(current_token.unwrap());
             }
-            current_token = Some(char_starts_token(i, c, tokens.len())?);
+            current_token = Some(char_starts_token(i, c, in_math_expr)?);
         }
     }
     if current_token.is_some() && current_token != Some(Token::NOP) {
@@ -343,17 +398,72 @@ pub fn tokenize_line(line: &String) -> Result<Vec<Token>, String> {
     Ok(tokens.into_iter().collect())
 }
 
-pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
-    tokens
-        .iter()
-        .map(|x| x.clone().to_value())
-        .try_fold(vec![], |acc, x| {
-            if let Ok(x) = x {
-                Ok([acc, vec![x]].concat())
+pub fn tokens_to_math_expression(tokens: &[Token]) -> Result<MathExpression, String> {
+    use Token::*;
+
+    // PEMDAS
+    if let Some((left, right)) = precidence_table!(
+        tokens.iter(),
+        Token::MathOp(':'),
+        Token::MathOp('&') | Token::MathOp('|'),
+        Token::MathOp('-') | Token::MathOp('+'),
+        Token::MathOp('/') | Token::MathOp('*'),
+        Token::MathOp('^')
+    )
+    .map(|i| tokens.split_at(i))
+    {
+        let (left, op, right) = (left, &right[0], &right[1..]);
+        if let Token::MathOp(op) = *op {
+            if left.len() == 0 {
+                Ok(MathExpression::Unary(
+                    op,
+                    Box::new(tokens_to_math_expression(right)?),
+                ))
+            } else if right.len() == 0 {
+                Err(format!(
+                    "Math operators always expect at least a right hand expression, '{}' got none",
+                    op
+                ))
             } else {
-                Err(format!("Unexpected value: `{:?}`", x))
+                Ok(MathExpression::Binary(
+                    op,
+                    Box::new(tokens_to_math_expression(left)?),
+                    Box::new(tokens_to_math_expression(right)?),
+                ))
             }
-        })
+        } else {
+            Err(format!("Expected math operator, got {:?}", op))
+        }
+    } else if tokens.len() == 1 {
+        match &tokens[0] {
+            Text(_) | Number(_) | Float(_, _) | List(_) => {
+                let toks = tokens_to_values(tokens)?;
+                Ok(MathExpression::Value(Box::new(toks[0].clone())))
+            }
+            Group(group_tokens) => tokens_to_math_expression(&group_tokens),
+            _ => Err(format!(
+                "Unexpected token `{:?}` in math expression!",
+                tokens[0]
+            )),
+        }
+    } else {
+        Err(format!(
+            "Expected one token/expression as argument to operator, unexpectedly got `{:?}`",
+            tokens
+        ))
+    }
+}
+
+pub fn tokens_to_values(tokens: &[Token]) -> Result<Vec<ASTValue>, String> {
+    let mut values = vec![];
+    for tok in tokens {
+        if let Ok(x) = tok.clone().to_value() {
+            values.push(x);
+        } else {
+            return Err(format!("Unexpected value: `{:?}`", tok));
+        }
+    }
+    Ok(values)
 }
 
 pub fn tokens_to_dbvalues(tokens: Vec<Token>) -> Result<Vec<DBValue>, String> {
@@ -372,8 +482,6 @@ pub fn tokens_to_dbvalues(tokens: Vec<Token>) -> Result<Vec<DBValue>, String> {
 }
 
 pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
-    // split at lowest precidence operators first
-
     if let Some((left, right)) = precidence_table!(
         tokens.iter(),
         Token::AltOp,
@@ -496,12 +604,12 @@ pub fn tokens_to_constraint(tokens: Vec<Token>) -> Result<Constraint, String> {
 }
 
 pub fn parse_line(line: String) -> Result<Constraint, String> {
-    let tokens = tokenize_line(&line)?;
+    let tokens = tokenize_line(&line, false)?;
     tokens_to_constraint(tokens)
 }
 
 pub fn parse_fact(line: String) -> Result<Vec<DBValue>, String> {
-    let tokens = tokenize_line(&line)?;
+    let tokens = tokenize_line(&line, false)?;
     tokens_to_dbvalues(tokens)
 }
 
@@ -557,7 +665,7 @@ impl fmt::Display for MetaAST {
 pub fn parse_file(lines: String) -> Result<Vec<MetaAST>, String> {
     let mut statements = vec![];
     let mut statement = vec![];
-    let tokens = tokenize_line(&lines)?;
+    let tokens = tokenize_line(&lines, false)?;
     let len = tokens.len() - 1;
     for (i, tok) in tokens.into_iter().enumerate() {
         if tok == Token::StatementEnd {
